@@ -3,19 +3,22 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { cn } from "@/lib/utils";
 
 /**
- * The turn loader (2026-10-29): the chat's "a turn is in flight" line.
- * Its mark speaks the plan map's language — three round nodes on one link;
- * a spark runs the link and lights each node as it passes, the way a plan
- * lights up as it is taught. Then the state in sentence case, and, once
+ * The turn loader (2026-10-29, reworked 2026-10-31): the chat's "a turn is
+ * in flight" line. Its mark speaks the plan map's language — three round
+ * nodes on one link. Each cycle the link draws from the first node to the
+ * last, every node lights as the line reaches it and stays lit, the last
+ * one pings, then the whole chain fades and starts again: a plan being
+ * built, not a blinking light. Then the state in sentence case, and, once
  * the turn has run a few seconds, how long.
  *
- * CSS-only motion (globals.css .lh-trail-*): the spark and the lit nodes
- * are compositor-animated; reduced motion shows a still mark with the
- * first node lit.
+ * CSS-only motion (globals.css .lh-weave-*): compositor-friendly
+ * transforms and opacity plus one dash offset; reduced motion shows a
+ * still mark with the first node lit. The line fades in on mount
+ * (lh-card-enter) so it never pops.
  */
 
-/** The link's ends and the nodes' centres, in the mark's viewBox units. */
-const NODES = [3, 13, 23] as const;
+/** The nodes' centres, in the mark's viewBox units. */
+const NODES = [4, 15, 26] as const;
 
 /** Whole seconds since mount, ticking once a second. */
 function useElapsedSeconds(): number {
@@ -38,17 +41,27 @@ export function ThinkingLoader({ label, className, testId }: { label: string; cl
 			role="status"
 			aria-label={label}
 			data-testid={testId ?? "thinking-loader"}
-			className={cn("flex items-center gap-2.5 text-[13px] text-muted-foreground", className)}
+			className={cn("lh-card-enter flex items-center gap-2.5 text-[13px] text-muted-foreground", className)}
 		>
-			<svg viewBox="0 0 26 10" className="h-3 w-auto shrink-0 overflow-visible" aria-hidden>
-				<line x1={NODES[0]} y1={5} x2={NODES[2]} y2={5} strokeWidth={1} className="stroke-border" />
+			<svg viewBox="0 0 30 12" className="h-4 w-auto shrink-0 overflow-visible" aria-hidden>
+				<line x1={NODES[0]} y1={6} x2={NODES[2]} y2={6} strokeWidth={1} strokeLinecap="round" className="stroke-border" />
+				<line
+					x1={NODES[0]}
+					y1={6}
+					x2={NODES[2]}
+					y2={6}
+					pathLength={1}
+					strokeWidth={1.4}
+					strokeLinecap="round"
+					className="lh-weave-link stroke-primary"
+				/>
 				{NODES.map((cx) => (
-					<circle key={`base-${cx}`} cx={cx} cy={5} r={2.4} strokeWidth={1} className="fill-card stroke-border" />
+					<circle key={`base-${cx}`} cx={cx} cy={6} r={2.6} strokeWidth={1} className="fill-card stroke-border" />
 				))}
+				<circle cx={NODES[2]} cy={6} r={2.6} className="lh-weave-halo fill-primary" />
 				{NODES.map((cx, i) => (
-					<circle key={`lit-${cx}`} cx={cx} cy={5} r={2.4} data-i={i} className="lh-trail-node fill-primary" />
+					<circle key={`lit-${cx}`} cx={cx} cy={6} r={2.6} data-i={i} className="lh-weave-node fill-primary" />
 				))}
-				<circle cx={NODES[0]} cy={5} r={1.3} className="lh-trail-spark fill-primary" />
 			</svg>
 			<Shimmer as="span" duration={1.8}>
 				{label}

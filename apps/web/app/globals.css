@@ -515,44 +515,41 @@ body {
 	}
 }
 
-/* The turn loader's trail (components/thinking-loader.tsx): one 1.6s
-   cycle — the spark runs the link from 10% to 80% (20 viewBox units; in
-   SVG a CSS px is a user unit), and each node lights as it arrives (its
-   delay = the spark's arrival: 10%, 45%, 80% of the cycle), then fades. */
-@keyframes lh-trail-spark {
+/* The turn loader's weave (components/thinking-loader.tsx): one 2s cycle.
+   The link draws from 6% to 68% (pathLength=1, so the dash runs 1 → 0);
+   each node lights as the line arrives (5%, 36%, 67%) and holds; the last
+   node pings (the halo); from 84% the whole chain fades out together. */
+@keyframes lh-weave-link {
 	0%,
-	10% {
-		transform: translateX(0);
-		opacity: 0;
-	}
-	16% {
+	6% {
+		stroke-dashoffset: 1;
 		opacity: 1;
 	}
-	80% {
-		transform: translateX(20px);
+	68%,
+	84% {
+		stroke-dashoffset: 0;
 		opacity: 1;
 	}
-	90%,
 	100% {
-		transform: translateX(20px);
+		stroke-dashoffset: 0;
 		opacity: 0;
 	}
 }
 
-@keyframes lh-trail-node {
-	0% {
+@keyframes lh-weave-node-0 {
+	0%,
+	5% {
 		opacity: 0;
-		transform: scale(0.6);
+		transform: scale(0.4);
 	}
-	8% {
+	13% {
 		opacity: 1;
-		transform: scale(1.15);
+		transform: scale(1.2);
 	}
-	22% {
+	22%,
+	84% {
+		opacity: 1;
 		transform: scale(1);
-	}
-	55% {
-		opacity: 0.25;
 	}
 	100% {
 		opacity: 0;
@@ -560,40 +557,99 @@ body {
 	}
 }
 
-.lh-trail-spark {
-	animation: lh-trail-spark 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+@keyframes lh-weave-node-1 {
+	0%,
+	36% {
+		opacity: 0;
+		transform: scale(0.4);
+	}
+	44% {
+		opacity: 1;
+		transform: scale(1.2);
+	}
+	53%,
+	84% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1);
+	}
 }
 
-.lh-trail-node {
+@keyframes lh-weave-node-2 {
+	0%,
+	67% {
+		opacity: 0;
+		transform: scale(0.4);
+	}
+	75% {
+		opacity: 1;
+		transform: scale(1.25);
+	}
+	84% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1);
+	}
+}
+
+@keyframes lh-weave-halo {
+	0%,
+	67% {
+		opacity: 0;
+		transform: scale(1);
+	}
+	72% {
+		opacity: 0.45;
+	}
+	100% {
+		opacity: 0;
+		transform: scale(2.6);
+	}
+}
+
+.lh-weave-link {
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+	animation: lh-weave-link 2s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+}
+
+.lh-weave-node,
+.lh-weave-halo {
 	opacity: 0;
 	transform-box: fill-box;
 	transform-origin: center;
-	animation: lh-trail-node 1.6s ease-out infinite backwards;
 }
 
-.lh-trail-node[data-i="0"] {
-	animation-delay: 0.16s;
+.lh-weave-node[data-i="0"] {
+	animation: lh-weave-node-0 2s ease-out infinite;
 }
 
-.lh-trail-node[data-i="1"] {
-	animation-delay: 0.72s;
+.lh-weave-node[data-i="1"] {
+	animation: lh-weave-node-1 2s ease-out infinite;
 }
 
-.lh-trail-node[data-i="2"] {
-	animation-delay: 1.28s;
+.lh-weave-node[data-i="2"] {
+	animation: lh-weave-node-2 2s ease-out infinite;
+}
+
+.lh-weave-halo {
+	animation: lh-weave-halo 2s ease-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.lh-trail-spark,
-	.lh-trail-node {
+	.lh-weave-link,
+	.lh-weave-node,
+	.lh-weave-halo {
 		animation: none;
 	}
 
-	.lh-trail-spark {
-		opacity: 0;
-	}
-
-	.lh-trail-node[data-i="0"] {
+	.lh-weave-node[data-i="0"] {
 		opacity: 1;
 	}
 }

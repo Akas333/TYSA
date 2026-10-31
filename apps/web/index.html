@@ -25,12 +25,73 @@
 				}
 			} catch (e) {}
 		</script>
+		<style>
+			/* Startup loader: shown inside #root until React's first render
+			   replaces it. It waits 250ms before fading in, so a fast start
+			   never flashes it. Self-contained: the app's stylesheet may not
+			   be loaded yet. The mark matches the chat's turn loader. */
+			html {
+				background: var(--background, #111112);
+			}
+			.boot-splash {
+				position: fixed;
+				inset: 0;
+				display: grid;
+				place-items: center;
+				opacity: 0;
+				animation: boot-in 300ms ease-out 250ms forwards;
+			}
+			.boot-splash svg {
+				height: 22px;
+				overflow: visible;
+			}
+			.boot-node {
+				fill: var(--primary, #0064e0);
+				opacity: 0.2;
+				animation: boot-node 1.4s ease-in-out infinite;
+			}
+			.boot-node:nth-of-type(2) {
+				animation-delay: 0.2s;
+			}
+			.boot-node:nth-of-type(3) {
+				animation-delay: 0.4s;
+			}
+			@keyframes boot-in {
+				to {
+					opacity: 1;
+				}
+			}
+			@keyframes boot-node {
+				0%,
+				100% {
+					opacity: 0.2;
+				}
+				35% {
+					opacity: 1;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.boot-node {
+					animation: none;
+					opacity: 0.6;
+				}
+			}
+		</style>
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600&display=swap" rel="stylesheet" />
 	</head>
 	<body class="min-h-dvh antialiased">
-		<div id="root"></div>
+		<div id="root">
+			<div class="boot-splash" role="status" aria-label="Loading">
+				<svg viewBox="0 0 30 12" aria-hidden="true">
+					<line x1="4" y1="6" x2="26" y2="6" stroke="var(--border, #2e3034)" stroke-width="1" stroke-linecap="round" />
+					<circle class="boot-node" cx="4" cy="6" r="2.6" />
+					<circle class="boot-node" cx="15" cy="6" r="2.6" />
+					<circle class="boot-node" cx="26" cy="6" r="2.6" />
+				</svg>
+			</div>
+		</div>
 		<script type="module" src="/main.tsx"></script>
 	</body>
 </html>
