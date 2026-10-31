@@ -54,6 +54,7 @@ import { prettyModel } from "@/components/usage-format";
 import { recommendSlots } from "@/components/onboarding-picks";
 import { OnboardingArt } from "@/components/onboarding-art";
 import { MenuShell } from "@/components/menu-shell";
+import { ProviderLogo } from "@/components/provider-logo";
 import { ModelMenuList } from "@/components/settings/model-menu";
 import type { ModelCatalogEntry, ModelCatalogResponse, ModelSlotName, ModelsSettings } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
@@ -436,7 +437,7 @@ function KeyRow({
 		</button>
 	);
 	return (
-		<OptionRow glyph={option.title[0]} title={option.title} detail={option.detail} action={action} testid={`onboarding-key-${option.id}`}>
+		<OptionRow glyph={<ProviderLogo id={option.id} fallback={option.title} className="size-4" />} title={option.title} detail={option.detail} action={action} testid={`onboarding-key-${option.id}`}>
 			{open && !connected && envVar && (
 				<div className="onb-enter flex flex-col gap-3 bg-(--pill)/30 px-4 pt-1 pb-4 sm:pl-15">
 					<ol className="flex flex-col gap-1.5 text-xs text-muted-foreground">
@@ -524,19 +525,19 @@ function ConnectStep({ connections }: { connections: ReturnType<typeof useConnec
 			<Group label="Use a subscription" hint="No API key and no extra bill. TYSA runs on your plan and its usage limits.">
 				<OptionList>
 					<OptionRow
-						glyph="C"
+						glyph={<ProviderLogo id="chatgpt" fallback="ChatGPT" className="size-4" />}
 						title="ChatGPT"
 						detail="Plus or Pro"
 						action={<span className="flex items-center gap-3">{connected.has("chatgpt") && <Connected />}<ChatGPTConnection setup hideLabel /></span>}
 					/>
 					<OptionRow
-						glyph="G"
+						glyph={<ProviderLogo id="github-copilot" fallback="GitHub Copilot" className="size-4" />}
 						title="GitHub Copilot"
 						detail="Free, Pro or Business"
 						action={<span className="flex items-center gap-3">{connected.has("github-copilot-subscription") && <Connected />}<NativeSubscriptionConnection providerId="github-copilot" hideLabel /></span>}
 					/>
 					<OptionRow
-						glyph="X"
+						glyph={<ProviderLogo id="xai" fallback="Grok" className="size-4" />}
 						title="Grok"
 						detail="SuperGrok or X Premium"
 						action={<span className="flex items-center gap-3">{connected.has("xai-subscription") && <Connected />}<NativeSubscriptionConnection providerId="xai" hideLabel /></span>}
@@ -953,7 +954,7 @@ export function Onboarding({
 			<style>{STYLES}</style>
 			<header className="flex h-15 shrink-0 items-center gap-6 px-4 sm:px-8">
 				<span className="flex items-center gap-2">
-					<img src="/favicon.svg" alt="" className="size-6 rounded-md" />
+					<img src="/logo.png" alt="" className="size-6 object-contain invert dark:invert-0" />
 					<span className="font-brand text-base tracking-tight text-foreground">TYSA</span>
 				</span>
 				<ol className="mx-auto hidden items-center gap-0.5 md:flex" aria-label="Setup progress">

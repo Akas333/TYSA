@@ -1,7 +1,7 @@
 {
 	"name": "@axiom/desktop",
 	"productName": "TYSA",
-	"version": "1.1.2",
+	"version": "1.1.3",
 	"description": "TYSA (Teach Yourself Anything): the desktop app.",
 	"license": "AGPL-3.0-only",
 	"private": true,
@@ -44,6 +44,9 @@
 			"target": [
 				"dmg"
 			],
+			"hardenedRuntime": true,
+			"entitlements": "resources/entitlements.mac.plist",
+			"entitlementsInherit": "resources/entitlements.mac.plist",
 			"extendInfo": {
 				"NSMicrophoneUsageDescription": "TYSA uses the microphone when you dictate answers."
 			}

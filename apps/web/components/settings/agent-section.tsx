@@ -69,6 +69,8 @@ import {
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
 import { cn } from "@/lib/utils";
+import { ChevronRightIcon, CopyIcon, RotateCcwIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SettingsGroup, SettingsRow, Toggle, CommitInput } from "./controls.tsx";
 import { ModelMenuList, ThinkingMenuList } from "./model-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
@@ -178,6 +180,13 @@ export function composeSearchEngine(
  *  unused. The switch's meaning becomes legible: it visibly controls
  *  this line). Exported for the pin. */
 export const PROMPT_IN_USE_HINT = "Your version is in use";
+
+/** A segment's readable name from its path: "teacher/30-question-principles.md"
+ *  → "Question principles", "system-prompt.md" → "System prompt". */
+export function segmentTitle(path: string): string {
+	const name = (path.split("/").pop() ?? path).replace(/\.md$/, "").replace(/^\d+-/, "").replace(/-/g, " ");
+	return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 /** One section of the prompt view — the owner's ruled order: Teacher,
  *  Prober, then Shared last. */
@@ -315,6 +324,7 @@ export function AgentSection({
 	const [openSegment, setOpenSegment] = useState<string | null>(null);
 	const [segmentDraft, setSegmentDraft] = useState<Record<string, string>>({});
 	const [segmentStatus, setSegmentStatus] = useState<string | null>(null);
+	const [segmentTab, setSegmentTab] = useState<"mine" | "default">("mine");
 	/** One open dropdown for the whole section: which slot (or the search
 	 *  row), which kind. */
 	const [openMenu, setOpenMenu] = useState<{ target: ModelSlotName | "search"; kind: "model" | "thinking" | "engine" } | null>(null);
@@ -468,8 +478,9 @@ export function AgentSection({
 		if (agent?.prompts?.[path] === true) {
 			onSectionChange(composePromptSwitch(agent, path, false));
 		}
+		setSegmentDraft(({ [path]: _, ...rest }) => rest);
 		readPrompts();
-		setSegmentStatus("Deleted");
+		setSegmentStatus("Back to the default");
 	}
 
 		/** The search-engine menu row — label + the quiet live-key mark. */
@@ -499,30 +510,53 @@ export function AgentSection({
 	const segmentRow = (info: SegmentInfo) => {
 		const fileExists = info.overrideText !== null;
 		const open = openSegment === info.path;
-		// The Save affordance (owner ruling, refined 2026-09-26): clickable
-		// only when there's something to save — the draft differs from
-		// what's on disk. An unchanged editor shows a grayed, inert Save
-		// (the always-active button was the "doesn't feel like it does
-		// anything" half of the report).
+		// Save is live only when the draft differs from what's on disk
+		// (owner ruling 2026-09-26: an always-active Save felt like a no-op).
 		const draft = segmentDraft[info.path] ?? info.overrideText ?? "";
 		const dirty = draft !== (info.overrideText ?? "");
+		const save = () => {
+			if (dirty) void saveSegment(info.path, draft);
+		};
+		const setDraft = (text: string) => {
+			setSegmentDraft({ ...segmentDraft, [info.path]: text });
+			setSegmentStatus(null);
+		};
 		return (
-			<div key={info.path} data-testid={`prompt-segment-${info.path}`}>
-				<SettingsRow
-					label={info.path}
-					// Overhaul rulings (2026-09-26, refined): the small text
-					// states WHICH VERSION IS IN USE — nothing when the
-					// default composes (even with a saved override sitting
-					// on disk unused), "Your version is in use" when the
-					// switch is on. The switch's meaning becomes legible
-					// through this line.
-					hint={info.enabled ? PROMPT_IN_USE_HINT : undefined}
-					testid={`prompt-row-${info.path}`}
-				>
-					{/* Graying ruling: ONLY the toggle dims without an
-					    override file — the file name above stays
-					    full-contrast (the whole-row dim is dead). */}
-					<span className={fileExists ? undefined : "opacity-40"}>
+			<div key={info.path} data-testid={`prompt-segment-${info.path}`} className={cn(open && "bg-muted/25")}>
+				<div data-testid={`prompt-row-${info.path}`} className="flex items-center gap-3 px-4 py-3">
+					<button
+						type="button"
+						aria-expanded={open}
+						onClick={() => {
+							setOpenSegment(open ? null : info.path);
+							setSegmentTab("mine");
+							setSegmentStatus(null);
+						}}
+						className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+					>
+						<ChevronRightIcon
+							className={cn(
+								"size-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground",
+								open && "rotate-90",
+							)}
+						/>
+						<span className="min-w-0">
+							<span className="flex items-center gap-2">
+								<span className="truncate text-sm text-foreground">{segmentTitle(info.path)}</span>
+								{/* Which version runs, legible at a glance: nothing
+								    for the default, a badge once there's an override. */}
+								{info.enabled ? (
+									<span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] text-primary">{PROMPT_IN_USE_HINT}</span>
+								) : fileExists ? (
+									<span className="shrink-0 rounded-full bg-(--pill) px-2 py-0.5 text-[11px] text-muted-foreground">Saved, not in use</span>
+								) : null}
+							</span>
+							<span className="block truncate font-mono text-[11px] text-muted-foreground/70">{info.path}</span>
+						</span>
+					</button>
+					{/* The switch needs an override file (route-enforced), so
+					    without one it's inert and dimmed. */}
+					<span className={fileExists ? undefined : "opacity-40"} title={fileExists ? undefined : "Write your own version to turn this on"}>
 						<Toggle
 							checked={info.enabled}
 							disabled={!fileExists}
@@ -530,72 +564,98 @@ export function AgentSection({
 							onChange={(on) => onSectionChange(composePromptSwitch(agent, info.path, on))}
 						/>
 					</span>
-				</SettingsRow>
-				<button
-					type="button"
-					onClick={() => {
-						setOpenSegment(open ? null : info.path);
-						setSegmentStatus(null);
-					}}
-					className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
-				>
-					{open ? "Hide text" : "Show text"}
-				</button>
+				</div>
 				{open && (
-					<div className="mt-1 flex flex-col gap-2">
-						<div>
-							<p className="mb-1 text-xs text-muted-foreground/70">Source</p>
-							<textarea
-								readOnly
-								value={info.sourceText}
-								aria-label="The original instructions"
-								className="h-24 w-full resize-y rounded-sm border border-border bg-muted p-2 font-ui text-xs text-muted-foreground"
-							/>
-						</div>
-						<div>
-							<p className="mb-1 text-xs text-muted-foreground/70">Override</p>
-							<textarea
-								value={segmentDraft[info.path] ?? info.overrideText ?? ""}
-								onChange={(e) => setSegmentDraft({ ...segmentDraft, [info.path]: e.target.value })}
-								aria-label="Your version of the instructions"
-								placeholder="Add your own instructions…"
-								className="h-24 w-full resize-y rounded-sm border border-border bg-background p-2 font-ui text-xs text-foreground outline-none"
-							/>
-						</div>
-						<div className="flex items-center gap-3">
-							<button
-								type="button"
-								disabled={!dirty}
-								onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")}
-								className={
-									dirty
-										? "text-xs text-foreground underline-offset-2 hover:underline"
-										: "cursor-not-allowed text-xs text-muted-foreground/40 underline-offset-2"
-								}
-							>
-								Save
-							</button>
-							{fileExists && (
+					<div className="flex flex-col gap-3 px-4 pb-4 pl-11">
+						<div className="flex items-center gap-1 self-start rounded-full bg-(--pill) p-0.5" role="tablist">
+							{(
+								[
+									["mine", "Your version"],
+									["default", "Default"],
+								] as const
+							).map(([id, label]) => (
 								<button
+									key={id}
 									type="button"
-									onClick={() => void deleteSegment(info.path)}
-									className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-red-500 hover:underline"
+									role="tab"
+									aria-selected={segmentTab === id}
+									onClick={() => setSegmentTab(id)}
+									className={cn(
+										"rounded-full px-3 py-1 text-xs transition-colors",
+										segmentTab === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+									)}
 								>
-									Delete
+									{label}
 								</button>
-							)}
-							{/* The quiet inline confirmation — next to the
-							    action, not the old path-echoing line at the
-							    section's bottom (production-copy: no file
-							    paths in user-facing status). One editor is
-							    open at a time (openSegment), so one shared
-							    status reads unambiguously. */}
-							{segmentStatus && (
-								<p className="text-xs text-muted-foreground/70" data-testid="segment-status">
-									{segmentStatus}
-								</p>
-							)}
+							))}
 						</div>
+						{segmentTab === "default" ? (
+							<div className="flex flex-col gap-2">
+								<pre
+									aria-label="The original instructions"
+									className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/60 p-3 font-mono text-[12px] leading-relaxed text-muted-foreground"
+								>
+									{info.sourceText}
+								</pre>
+								<div className="flex justify-end">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setDraft(info.sourceText);
+											setSegmentTab("mine");
+										}}
+									>
+										<CopyIcon />
+										Edit a copy
+									</Button>
+								</div>
+							</div>
+						) : (
+							<div className="flex flex-col gap-2">
+								<textarea
+									value={draft}
+									onChange={(e) => setDraft(e.target.value)}
+									onKeyDown={(e) => {
+										if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "Enter")) {
+											e.preventDefault();
+											save();
+										}
+									}}
+									aria-label="Your version of the instructions"
+									placeholder="Write your own instructions for this part…"
+									spellCheck={false}
+									className="min-h-56 w-full resize-y rounded-xl border border-border/60 bg-background p-3 font-mono text-[12px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-ring"
+								/>
+								<div className="flex flex-wrap items-center gap-2">
+									{/* One editor open at a time, so one shared status
+									    line reads unambiguously; no file paths in it. */}
+									<span className="mr-auto text-xs text-muted-foreground/80" data-testid="segment-status">
+										{segmentStatus ?? (dirty ? "Unsaved changes" : `${draft.length.toLocaleString()} characters`)}
+									</span>
+									{draft === "" && (
+										<Button variant="ghost" size="sm" onClick={() => setDraft(info.sourceText)}>
+											<CopyIcon />
+											Start from the default
+										</Button>
+									)}
+									{fileExists && (
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => void deleteSegment(info.path)}
+											className="text-muted-foreground hover:text-red-500"
+										>
+											<RotateCcwIcon />
+											Reset to default
+										</Button>
+									)}
+									<Button size="sm" disabled={!dirty} onClick={save}>
+										Save
+									</Button>
+								</div>
+							</div>
+						)}
 					</div>
 				)}
 			</div>
@@ -882,27 +942,34 @@ export function AgentSection({
 			</SettingsGroup>
 
 			<SettingsGroup label="System prompts" testid="group-prompts">
+				<p className="mb-4 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+					Each agent's instructions are built from these parts, in order. Open one to read it or write your own version.
+				</p>
 				{prompts === null ? (
 					<p className="text-xs text-muted-foreground/70">Loading prompt segments…</p>
 				) : (
-					<div className="flex flex-col gap-4">
+					<div className="flex flex-col gap-6">
 						{/* The owner's ruled order (2026-09-26): Teacher first,
 						    then Prober, then Shared LAST — shared chunks once
 						    (deduplicated), each section in prompt-assembly
 						    order. */}
-						{sectionedSegments(prompts).map((section) => (
-							<div key={section.id} data-testid={`prompt-section-${section.id}`}>
-								<p className="mb-1 text-xs text-muted-foreground/70">
-									{section.label}
-								</p>
-								{section.hint && (
-									<p className="mb-1 text-xs text-muted-foreground/60">{section.hint}</p>
-								)}
-								<div className="flex flex-col gap-2">
-									{section.segments.map((info) => segmentRow(info))}
+						{sectionedSegments(prompts).map((section) => {
+							const custom = section.segments.filter((s) => s.enabled).length;
+							return (
+								<div key={section.id} data-testid={`prompt-section-${section.id}`}>
+									<div className="mb-2 flex items-baseline gap-2 px-1">
+										<p className="text-sm font-medium text-foreground">{section.label}</p>
+										{section.hint && <p className="text-xs text-muted-foreground">{section.hint}</p>}
+										<p className="ml-auto text-xs text-muted-foreground/70">
+											{custom > 0 ? `${custom} of ${section.segments.length} customized` : `${section.segments.length} ${section.segments.length === 1 ? "part" : "parts"}`}
+										</p>
+									</div>
+									<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60">
+										{section.segments.map((info) => segmentRow(info))}
+									</div>
 								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</SettingsGroup>

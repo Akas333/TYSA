@@ -8,7 +8,7 @@
  * keys. KAPANY_SERVE_WEB/KAPANY_WEB_DIR make it serve the web app too.
  */
 
-const { app, BrowserWindow, dialog, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, shell, systemPreferences, utilityProcess } = require("electron");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
@@ -123,7 +123,14 @@ function createWindow() {
 	// Microphone (dictation) and clipboard only, and only for the app itself.
 	contents.session.setPermissionRequestHandler((wc, permission, callback, details) => {
 		const allowed = ["media", "clipboard-read", "clipboard-sanitized-write"].includes(permission);
-		callback(allowed && isAppUrl(details.requestingUrl ?? wc.getURL()));
+		if (!allowed || !isAppUrl(details.requestingUrl ?? wc.getURL())) return callback(false);
+		// macOS: ask for the microphone up front, so the system prompt shows
+		// (and a "no" in System Settings comes back as a denial, not silence).
+		if (permission === "media" && process.platform === "darwin" && details.mediaTypes?.includes("audio")) {
+			systemPreferences.askForMediaAccess("microphone").then(callback, () => callback(false));
+			return;
+		}
+		callback(true);
 	});
 
 	window.loadFile(path.join(__dirname, "loading.html"));

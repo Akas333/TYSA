@@ -21,14 +21,15 @@ import { CONFIDENCE_STOPS } from "@/src/core";
  * color. Ticks skip 0 and 100 (the rail's ends already say those).
  */
 
-/** The six-step ramp (owner ruling): 0 red → 100 emerald, indexed by stop. */
+/** The six-step ramp (owner ruling): 0 red → 100 emerald, indexed by stop.
+ *  Muted tones (owner, 2026-10-31: the saturated ramp read too bright). */
 export const CONFIDENCE_COLORS: readonly string[] = [
-	"#ef4444", // 0
-	"#f97316", // 30
-	"#eab308", // 50
-	"#84cc16", // 70
-	"#22c55e", // 90
-	"#10b981", // 100
+	"#d9776f", // 0
+	"#d9905e", // 30
+	"#cfb05a", // 50
+	"#a3bf6a", // 70
+	"#6fbf8a", // 90
+	"#5fb39a", // 100
 ];
 
 /** The rail's paint for a stop value (0–100). */

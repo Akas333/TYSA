@@ -1,6 +1,6 @@
 import { chainsForSelection, formatChainLine } from "../../core/index.ts";
 import { newGraphContextMessage, type GraphContextPick } from "../../core/index.ts";
-import { compactionInFlight, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "../../server/index.ts";
+import { compactionInFlight, createChat, isTurnRunning, listChats, nameChat, readSettingsRecord, stores, titleFromPrompt } from "../../server/index.ts";
 import type { ChatListItem } from "../../core/index.ts";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -30,6 +30,9 @@ export async function POST(req: Request) {
 	// guided default. Practice ignores it.
 	const style = body.style === "textbook" ? ("textbook" as const) : undefined;
 	const chat = createChat(titleFromPrompt(title || "Untitled session"), kind, style);
+	// The cut title is a placeholder: the cheap model names the session in
+	// the background (server/chat-title.ts) and the sidebar picks it up.
+	if (title.trim() && process.env.NODE_ENV !== "test") void nameChat(chat.id, title);
 	// Started from a folder in the sidebar: save it there from birth. An
 	// unknown folder id (deleted meanwhile) just leaves it outside folders.
 	const folderId = body.folderId;

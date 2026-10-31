@@ -13,10 +13,8 @@ import {
 	ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { ThinkingLoader } from "@/components/thinking-loader";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
-import { Separator } from "@/components/ui/separator";
 import { AnsweredCard } from "@/components/answered-card";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
@@ -58,7 +56,6 @@ import { PracticeDock } from "@/components/practice-dock";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
-import { LhMark } from "@/components/lh-mark";
 import { PLAN_CONFIRM_MESSAGE, PlanConfirmBar } from "@/components/plan-confirm-bar";
 import { SUMMARY_MESSAGE, SummaryOfferBar, lastSummaryRequest, planComplete } from "@/components/summary-offer";
 import type { ArtifactPartProps, CourseContextData, CourseLink, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
@@ -374,6 +371,17 @@ export function Chat({
 		window.addEventListener("lh:chat-renamed", onRenamed);
 		return () => window.removeEventListener("lh:chat-renamed", onRenamed);
 	}, [chatId]);
+	// The server names a new session in the background (the cheap model,
+	// server/chat-title.ts): pick its title up when the list changes.
+	useServerEvent("chats-changed", () => {
+		void fetch("/api/chats")
+			.then((r) => (r.ok ? (r.json() as Promise<{ chats: { id: string; title: string }[] }>) : null))
+			.then((data) => {
+				const next = data?.chats.find((c) => c.id === chatId)?.title;
+				if (next) setTitleText((prev) => (next !== prev ? next : prev));
+			})
+			.catch(() => {});
+	});
 
 	// The Esc chain's last link: abort the turn. The background runner
 	// decoupled turns from views, so the abort is ALWAYS the remote kill
@@ -1644,22 +1652,10 @@ export function Chat({
 											</div>
 										</div>
 									) : (
-									<div data-testid="assistant-message" className="flex w-full gap-3">
-										{/* The teacher's avatar opens each run of assistant
-										    messages; follow-on messages keep the indent only.
-										    Phones drop the gutter — the name line still marks
-										    the speaker, and the prose gets the width. */}
-										<div className="w-7 shrink-0 pt-0.5 max-sm:hidden">
-											{messages[mi - 1]?.role !== "assistant" && (
-												<span className="flex size-7 items-center justify-center rounded-full border border-input bg-card">
-													<LhMark className="size-4" />
-												</span>
-											)}
-										</div>
+									<div data-testid="assistant-message" className="flex w-full">
+									{/* The teacher's reply is just its words (owner, 2026-10-31):
+									    no avatar or name line, no reasoning chips, no tool rows. */}
 									<Message from="assistant" className="min-w-0 max-w-full flex-1">
-									{messages[mi - 1]?.role !== "assistant" && (
-										<div className="flex h-7 items-center text-sm font-semibold text-foreground">TYSA</div>
-									)}
 									<MessageContent className="w-full">
 											{m.parts.map((part, pi) => [partOpenerFor(mi, pi), ((): ReactNode => {
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
@@ -1690,6 +1686,11 @@ export function Chat({
 														</SystemLine>
 													);
 												}
+												// Hidden work (reasoning, tools with no card) shows only
+												// while it is the live edge of the turn, as the same
+												// Thinking row the placeholder uses; settled, it's gone.
+												const working = isLastPart && (status === "streaming" || turnInFlight);
+												const thinkingRow = working ? <ThinkingLoader key={pi} label="Thinking" className="my-1" /> : null;
 												switch (part.type) {
 													case "text": {
 														const sourceId = textPartMessageId(part.id);
@@ -1701,16 +1702,11 @@ export function Chat({
 														);
 													}
 													case "reasoning":
-														return (
-															<Reasoning key={pi} isStreaming={status === "streaming" && isLastPart} className="mb-2">
-																<ReasoningTrigger />
-																<ReasoningContent>{part.text ?? ""}</ReasoningContent>
-															</Reasoning>
-														);
+														return thinkingRow;
 													case "step-start":
 														if (teachBoundary)
 															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" />;
-														return pi > 0 ? <Separator key={pi} className="my-3" /> : null;
+														return pi > 0 ? <div key={pi} className="h-3" aria-hidden /> : null;
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// block — rendered as carried, never re-derived.
@@ -1756,6 +1752,11 @@ export function Chat({
 														return null;
 													}
 													default: {
+														// A tool with no card of its own (list_sessions, read,
+														// plan_*…) is hidden work: the Thinking row at most.
+														if (part.type.startsWith("tool-") && !artifactRenderers[part.type.slice("tool-".length)]) {
+															return thinkingRow;
+														}
 														// A tool call being WRITTEN (owner, streaming round 2026-10-01):
 														// input-streaming spans the whole execution, and the live card —
 														// spinner + shimmered activity label, the input watchable on expand
