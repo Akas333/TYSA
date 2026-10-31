@@ -22,6 +22,18 @@ export default defineConfig({
 		"process.env.LH_VERSION": JSON.stringify(pkg.version),
 		"process.env.LH_HOMEPAGE": JSON.stringify(""),
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				// Libraries that change rarely get their own files, so an app
+				// update doesn't make browsers download them again.
+				manualChunks(id) {
+					if (/node_modules\/(react|react-dom|scheduler|react-router)\//.test(id)) return "react";
+					if (id.includes("node_modules/katex/")) return "katex";
+				},
+			},
+		},
+	},
 	server: {
 		// PORT lets a second dev server run beside another (the app assigns it).
 		port: Number(process.env.PORT ?? 5173),

@@ -9,7 +9,6 @@
  * component in the first place.
  */
 
-import { createMermaidPlugin } from "@streamdown/mermaid";
 import type { MermaidConfig } from "mermaid";
 
 /** The chart's base font size (px) — mermaid sizes ALL text relative to
@@ -30,7 +29,20 @@ export const mermaidTheme: MermaidConfig = {
 	theme: "dark",
 };
 
-const plugin = createMermaidPlugin();
+// Mermaid is ~1 MB of script, needed only when a chart is on screen: load
+// the plugin on the first render instead of with the app. One instance,
+// shared by every later render.
+let plugin: Promise<ReturnType<typeof import("@streamdown/mermaid").createMermaidPlugin>> | undefined;
+function loadPlugin() {
+	plugin ??= import("@streamdown/mermaid").then(
+		(m) => m.createMermaidPlugin(),
+		(err) => {
+			plugin = undefined; // a failed chunk load retries on the next chart
+			throw err;
+		},
+	);
+	return plugin;
+}
 
 /** Render one chart source to an svg string. The id is unique per call —
  *  mermaid caches rendered ids, and a repeated id across charts/renders
@@ -40,6 +52,6 @@ export async function renderMermaid(chart: string): Promise<string> {
 	// Light themes drop html.dark (components/settings/themes.ts): match it.
 	const dark = typeof document === "undefined" || document.documentElement.classList.contains("dark");
 	const config: MermaidConfig = { ...mermaidTheme, theme: dark ? "dark" : "default" };
-	const { svg } = await plugin.getMermaid(config).render(id, chart);
+	const { svg } = await (await loadPlugin()).getMermaid(config).render(id, chart);
 	return svg;
 }

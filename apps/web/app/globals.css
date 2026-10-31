@@ -472,6 +472,17 @@ body {
    alone: the terminal braille spinner (components/braille-spinner.tsx),
    monochrome, existing only while true. */
 
+/* The text shimmer's sweep (components/ai-elements/shimmer.tsx). */
+@keyframes lh-shimmer {
+	from {
+		background-position: 100% center;
+	}
+
+	to {
+		background-position: 0% center;
+	}
+}
+
 /* One keyframes, all ten frames: each frame <g> holds opacity 1 for its
    10% slice of the 800ms cycle and 0 elsewhere; frames stagger via
    positive animation-delay (frame k starts at k×80ms). Static contexts
