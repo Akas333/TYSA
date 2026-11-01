@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+	BookOpenIcon,
 	CornerDownLeftIcon,
 	DumbbellIcon,
 	GraduationCapIcon,
 	NetworkIcon,
-	PlusIcon,
 	SearchIcon,
 	SettingsIcon,
 	SparklesIcon,
@@ -154,8 +154,10 @@ export function SearchPalette() {
 			}),
 		});
 		const actions: Item[] = [
-			{ key: "a:teach", group: "Actions", icon: <PlusIcon className="size-4" />, title: "New teaching", run: go(() => router.push("/chat/new")) },
-			{ key: "a:practice", group: "Actions", icon: <DumbbellIcon className="size-4" />, title: "New practice", run: go(() => router.push("/chat/new?mode=practice")) },
+			// Named like the session-type menu under the composer.
+			{ key: "a:teach", group: "Actions", icon: <GraduationCapIcon className="size-4" />, title: "New guided session", run: go(() => router.push("/chat/new")) },
+			{ key: "a:textbook", group: "Actions", icon: <BookOpenIcon className="size-4" />, title: "New textbook session", run: go(() => router.push("/chat/new?mode=textbook")) },
+			{ key: "a:practice", group: "Actions", icon: <DumbbellIcon className="size-4" />, title: "New practice session", run: go(() => router.push("/chat/new?mode=practice")) },
 			{ key: "a:graph", group: "Actions", icon: <NetworkIcon className="size-4" />, title: "Open knowledge graph", run: go(() => router.push("/")) },
 			{ key: "a:settings", group: "Actions", icon: <SettingsIcon className="size-4" />, title: "Settings", run: go(() => openSettings()) },
 		];
@@ -234,6 +236,7 @@ export function SearchPalette() {
 						onChange={(e) => setQuery(e.target.value)}
 						placeholder="Search sessions, concepts and actions"
 						aria-label="Search"
+						enterKeyHint="go"
 						className="lh-input min-w-0 flex-1 bg-transparent py-1 text-lg outline-none placeholder:text-muted-foreground/70"
 					/>
 					<button
@@ -303,7 +306,7 @@ export function SearchPalette() {
 										<span className="min-w-0 flex-1 truncate">{item.title}</span>
 										{item.meta && <span className="shrink-0 text-xs text-muted-foreground">{item.meta}</span>}
 										<CornerDownLeftIcon
-											className={cn("size-4 shrink-0 text-muted-foreground", selected ? "opacity-100" : "opacity-0")}
+											className={cn("size-4 shrink-0 text-muted-foreground max-sm:hidden pointer-coarse:hidden", selected ? "opacity-100" : "opacity-0")}
 										/>
 									</button>
 								</div>
@@ -312,8 +315,8 @@ export function SearchPalette() {
 					)}
 				</div>
 
-				{/* Keyboard footer */}
-				<div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border/60 px-5 py-3 text-xs text-muted-foreground">
+				{/* Keyboard footer — phones have no keys to hint at. */}
+				<div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border/60 px-5 py-3 text-xs text-muted-foreground max-sm:hidden pointer-coarse:hidden">
 					<FooterKey label="Close" keys={["Esc"]} />
 					<FooterKey label="Move" keys={["↑", "↓"]} />
 					<FooterKey label="Change type" keys={["Tab", "←", "→"]} />

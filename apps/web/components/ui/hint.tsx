@@ -34,21 +34,26 @@ interface HintProps {
 
 /** The composition itself, pure — "Dictate" + ⌘D → "Dictate (⌘D)". Exported
  *  for the mechanism pins (tests/tooltip-mechanism.test.tsx). */
+function liveBinding(action?: KeyAction, binding?: string): string {
+	return action ? formatBinding(bindingForAction(action)) : binding ? formatBinding(binding) : ""
+}
+
 export function hintText(label: string, action?: KeyAction, binding?: string): string {
-	const live = action
-		? formatBinding(bindingForAction(action))
-		: binding
-			? formatBinding(binding)
-			: ""
+	const live = liveBinding(action, binding)
 	return live ? `${label} (${live})` : label
 }
 
 export function Hint({ label, action, binding, side = "top", children }: HintProps) {
+	const live = liveBinding(action, binding)
 	return (
 		<TooltipProvider>
 			<Tooltip>
 				<TooltipTrigger asChild>{children}</TooltipTrigger>
-				<TooltipContent side={side}>{hintText(label, action, binding)}</TooltipContent>
+				<TooltipContent side={side}>
+					{label}
+					{/* Phones have no keys: the shortcut suffix drops. */}
+					{live && <span className="max-sm:hidden pointer-coarse:hidden"> ({live})</span>}
+				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>
 	)

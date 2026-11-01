@@ -75,7 +75,15 @@ function buildSphere(rings: number): Particle[] {
  * assistive tech, pointer events pass through to the content on top, and it
  * fades toward the edges. The parent must be `relative` (the canvas fills it).
  */
-export function SphereBackdrop({ zoom = 1 }: { zoom?: number }) {
+/** Narrow canvases (phones) with `liftOnNarrow`: the globe moves up into the
+ *  space above the hero, which docks at the bottom of the screen, so no
+ *  text ever sits on the dots. */
+const NARROW_W = 640;
+const LIFTED_CY = 0.38; // globe centre, as a fraction of the height
+const LIFTED_R_W = 0.42; // radius cap, as a fraction of the width
+const LIFTED_R_H = 0.2; // radius cap, as a fraction of the height
+
+export function SphereBackdrop({ zoom = 1, liftOnNarrow = false }: { zoom?: number; liftOnNarrow?: boolean }) {
 	const ref = useRef<HTMLCanvasElement | null>(null);
 	useEffect(() => {
 		const canvas = ref.current;
@@ -91,13 +99,20 @@ export function SphereBackdrop({ zoom = 1 }: { zoom?: number }) {
 		let w = 0;
 		let h = 0;
 		let dpr = 1;
+		let lifted = false;
 		const resize = () => {
 			dpr = Math.min(window.devicePixelRatio || 1, 2);
 			w = canvas.clientWidth;
 			h = canvas.clientHeight;
 			canvas.width = Math.round(w * dpr);
 			canvas.height = Math.round(h * dpr);
+			lifted = liftOnNarrow && w > 0 && w < NARROW_W;
+			// The edge fade follows the globe's centre.
+			const mask = `radial-gradient(ellipse at 50% ${lifted ? LIFTED_CY * 100 : 50}%, black 45%, transparent 85%)`;
+			canvas.style.maskImage = mask;
+			canvas.style.setProperty("-webkit-mask-image", mask);
 		};
+		const centreY = () => (lifted ? h * LIFTED_CY : h / 2);
 		resize();
 		const ro = new ResizeObserver(resize);
 		ro.observe(canvas);
@@ -113,7 +128,7 @@ export function SphereBackdrop({ zoom = 1 }: { zoom?: number }) {
 		const drag = { active: false, id: -1, x: 0, y: 0, t: 0, moved: 0 };
 		const isBare = (target: EventTarget | null) =>
 			!(target as HTMLElement | null)?.closest?.("button, a, input, textarea, select, [role=button], [contenteditable]");
-		const onSphere = (x: number, y: number) => Math.hypot(x - w / 2, y - h / 2) < radius * 1.05;
+		const onSphere = (x: number, y: number) => Math.hypot(x - w / 2, y - centreY()) < radius * 1.05;
 
 		const onMove = (e: PointerEvent) => {
 			const r = canvas.getBoundingClientRect();
@@ -191,8 +206,8 @@ export function SphereBackdrop({ zoom = 1 }: { zoom?: number }) {
 			ctx.clearRect(0, 0, w, h);
 
 			const cx = w / 2;
-			const cy = h / 2;
-			radius = Math.min(w, h * 1.15) * 0.42 * zoom;
+			const cy = centreY();
+			radius = (lifted ? Math.min(w * LIFTED_R_W, h * LIFTED_R_H) : Math.min(w, h * 1.15) * 0.42) * zoom;
 
 			// Rotation: a slow idle spin plus the drag's yaw/pitch with inertia.
 			// Hovering never turns the globe — only grabbing does.
@@ -334,16 +349,13 @@ export function SphereBackdrop({ zoom = 1 }: { zoom?: number }) {
 			document.removeEventListener("visibilitychange", onVisibility);
 			host.removeEventListener("pointerdown", onDown);
 		};
-	}, [zoom]);
+	}, [zoom, liftOnNarrow]);
 	return (
 		<canvas
 			ref={ref}
 			aria-hidden
+			// The edge-fade mask is set in resize(): it moves with the globe.
 			className="pointer-events-none absolute inset-0 block h-full w-full"
-			style={{
-				maskImage: "radial-gradient(ellipse at center, black 45%, transparent 85%)",
-				WebkitMaskImage: "radial-gradient(ellipse at center, black 45%, transparent 85%)",
-			}}
 		/>
 	);
 }

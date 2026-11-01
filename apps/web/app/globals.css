@@ -225,6 +225,9 @@ body {
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
 	-webkit-tap-highlight-color: transparent;
+	/* A word longer than its line (a URL, a pasted hash) wraps instead of
+	   running past the column; ordinary text never breaks mid-word. */
+	overflow-wrap: break-word;
 }
 
 /* Safe areas (notch, rounded corners, home indicator). The viewport is
@@ -240,6 +243,10 @@ body {
 }
 .lh-safe-shell {
 	padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+	/* An open on-screen keyboard covers the home indicator: the larger of
+	   the two wins (--lh-keyboard, lib/keyboard-inset.ts; 0 on Android,
+	   which shrinks the page itself). */
+	padding-bottom: max(var(--safe-bottom), var(--lh-keyboard, 0px));
 }
 
 /* iOS zooms the page when a focused field's text is under 16px. Keep

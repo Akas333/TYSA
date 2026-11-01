@@ -1,19 +1,19 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/lib/navigation";
+import { isPhoneScreen } from "@/lib/use-phone-screen";
 import { Composer, COMPOSER_SHELL } from "@/components/composer";
 import { joinDictation, useDictation } from "@/components/dictation";
 import { FolderIcon, PlusIcon, XIcon } from "lucide-react";
-import { LhMark } from "@/components/lh-mark";
 import { SphereBackdrop } from "@/components/sphere-backdrop";
 import { Hint } from "@/components/ui/hint";
 import { StatsBar } from "@/components/stats-bar";
 import { useFieldCycle } from "@/components/field-cycle";
-import { SidebarToggle } from "@/components/sidebar";
+import { SidebarToggle, useSidebar } from "@/components/sidebar";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useStrongKeyless, useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
-import { ComposerActions, SessionModeToggle, type SessionMode } from "@/components/composer-actions";
+import { ComposerActions, SessionModeMenu, type SessionMode } from "@/components/composer-actions";
 import { AttachMaterialControl, uploadMaterial } from "@/components/material-cards";
 import type { ChatFolder, ChatSettings, GraphSnapshot } from "@/src/core";
 
@@ -173,13 +173,17 @@ export function DraftShell({
 	/* Run end focuses the composer (owner, 2026-10-01): the hands are on
 	 * the keyboard from the stop — falling edge of `active` only. */
 	const composerInputRef = useRef<HTMLTextAreaElement>(null);
+	// Phone width: a one-line placeholder keeps the composer one line tall.
+	const { mobile } = useSidebar();
 	const dictationWasActiveRef = useRef(false);
 	useEffect(() => {
 		if (dictation.active) {
 			dictationWasActiveRef.current = true;
 		} else if (dictationWasActiveRef.current) {
 			dictationWasActiveRef.current = false;
-			composerInputRef.current?.focus();
+			// Not on a phone: the learner was talking, not typing — focus
+			// would pop the on-screen keyboard over the page.
+			if (!isPhoneScreen()) composerInputRef.current?.focus();
 		}
 	}, [dictation.active]);
 	return (
@@ -190,15 +194,17 @@ export function DraftShell({
 		 * (the only pointer-events-auto spot), the empty state carrying the
 		 * orientation. The chain picker then owns the column top exactly
 		 * like the graph view's — no stacked bars. */
-		<div className="relative flex h-dvh">
+		<div className="relative flex h-full">
 			<div className="flex min-w-0 flex-1 flex-col">
 				<div className="relative flex min-h-0 flex-1">
-					{/* The hero: mark, the question, one card holding the input and
+					{/* The hero: the question, then one card holding the input and
 					    every control (layout after Perplexity's home). */}
-					<SphereBackdrop />
-					<div className="relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-[12vh] pt-16">
-						<LhMark className="size-10 text-foreground" />
-						<h1 className="mt-6 text-center text-3xl font-normal tracking-tight text-foreground sm:text-[2.1rem]">
+					{/* On a phone the hero docks at the bottom, in thumb reach
+					    (pb-5, home's dock gap), and the globe sits in the space
+					    above it (liftOnNarrow), so no text lands on the dots. */}
+					<SphereBackdrop liftOnNarrow />
+					<div className="relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-[12vh] pt-16 max-sm:justify-end max-sm:pb-5">
+						<h1 className="text-center text-2xl font-normal tracking-tight text-foreground sm:text-[2.1rem]">
 							{mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
 						</h1>
 						{folderName && (
@@ -217,7 +223,7 @@ export function DraftShell({
 								</Hint>
 							</div>
 						)}
-						<div className={`${DOCK} mt-9`}>
+						<div className={`${DOCK} mt-9 max-sm:mt-6 max-sm:px-0`}>
 							{setupCta && <ComposerActions setup={setupCta} />}
 							<div className={COMPOSER_SHELL}>
 								<Composer
@@ -232,23 +238,32 @@ export function DraftShell({
 									onEscape={dictation.active ? dictation.cancel : undefined}
 									placeholder={
 										mode === "practice"
-											? "Describe a topic, or pick nodes from your graph…"
-											: "Ask about any topic — the teacher starts by finding what you know…"
+											? mobile
+												? "Describe a topic…"
+												: "Describe a topic, or pick nodes from your graph…"
+											: mobile
+												? "Ask about any topic…"
+												: "Ask about any topic — the teacher starts by finding what you know…"
 									}
 									dictation={dictation}
 									leading={
-										mode === "practice" ? (
-											<Hint label="Pick nodes from your graph" side="bottom">
-												<button
-													type="button"
-													aria-label="Pick nodes from your graph"
-													data-testid="practice-props-chip"
-													onClick={onOpenPicker}
-													className="flex size-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-(--pill) hover:text-foreground"
-												>
-													<PlusIcon className="size-5" />
-												</button>
-											</Hint>
+										onPickFiles || mode === "practice" ? (
+											<>
+												{onPickFiles && <AttachMaterialControl onPicked={onPickFiles} pasteTarget={composerInputRef} />}
+												{mode === "practice" && (
+													<Hint label="Pick nodes from your graph" side="bottom">
+														<button
+															type="button"
+															aria-label="Pick nodes from your graph"
+															data-testid="practice-props-chip"
+															onClick={onOpenPicker}
+															className="flex size-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-(--pill) hover:text-foreground"
+														>
+															<PlusIcon className="size-5" />
+														</button>
+													</Hint>
+												)}
+											</>
 										) : undefined
 									}
 								/>
@@ -257,8 +272,7 @@ export function DraftShell({
 								turns={[]}
 								leadingSlot={
 									<div className="flex items-center gap-2">
-										<SessionModeToggle mode={mode} onChange={(m) => onModeChange?.(m)} testIdPrefix="draft-mode" />
-										{onPickFiles && <AttachMaterialControl onPicked={onPickFiles} pasteTarget={composerInputRef} />}
+										<SessionModeMenu mode={mode} onChange={(m) => onModeChange?.(m)} testIdPrefix="draft-mode" />
 										{pendingFiles.length > 0 && (
 											<span data-testid="draft-materials" className="flex items-center gap-1 rounded-full bg-(--pill) py-0.5 pl-2.5 pr-0.5 text-sm text-foreground">
 												{pendingFiles.length} {pendingFiles.length === 1 ? "file" : "files"} attached

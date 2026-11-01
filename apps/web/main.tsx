@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import "katex/dist/katex.min.css";
 import "./app/globals.css";
 import RootLayout from "./app/layout";
+import { trackKeyboardInset } from "./lib/keyboard-inset";
 import HomePage from "./app/page";
 import NewSessionPage from "./app/chat/new/page";
 import ChatPage from "./app/chat/[id]/page";
@@ -21,6 +22,8 @@ const router = createBrowserRouter([
 		],
 	},
 ]);
+
+trackKeyboardInset();
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>

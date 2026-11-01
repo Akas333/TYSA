@@ -52,8 +52,9 @@ import { DataSection } from "./data-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 import { SettingsSkinContext } from "./controls.tsx";
-import { BotIcon, HardDriveIcon, KeyboardIcon, KeyRoundIcon, NetworkIcon, PaletteIcon, SearchIcon, SettingsIcon, XIcon } from "lucide-react";
+import { BotIcon, ChevronLeftIcon, ChevronRightIcon, HardDriveIcon, KeyboardIcon, KeyRoundIcon, NetworkIcon, PaletteIcon, SearchIcon, SettingsIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePhoneScreen } from "@/lib/use-phone-screen";
 
 /** Owner (2026-09-20): hints earn their place — mechanics-explaining
  *  prose is out; only the keyboard note stays (storage location is a
@@ -88,10 +89,12 @@ export function SettingsDialogProvider({
 	children: React.ReactNode;
 }) {
 	const [show, setShow] = useState(false);
-	const [landOn, setLandOn] = useState<SectionId>("keys");
+	// null = no section asked for: desktop shows Providers, a phone shows
+	// the list of sections.
+	const [landOn, setLandOn] = useState<SectionId | null>(null);
 	const [landOnRow, setLandOnRow] = useState<string | null>(null);
 	const open = useCallback((section?: string, row?: string) => {
-		setLandOn(section ? section as SectionId : "keys");
+		setLandOn(section ? section as SectionId : null);
 		setLandOnRow(row ?? null);
 		setShow(true);
 	}, []);
@@ -99,7 +102,7 @@ export function SettingsDialogProvider({
 		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
-				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} initialRow={landOnRow} />
+				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn ?? undefined} initialRow={landOnRow} />
 			)}
 		</DialogContext.Provider></NativeSubscriptionUIProvider></ChatGPTUIProvider>
 	);
@@ -115,7 +118,7 @@ function SettingsDialog({
 	initialRow,
 }: {
 	onClose: () => void;
-	initialSection: SectionId;
+	initialSection?: SectionId;
 	/** The keys-section row to unfold (see DialogContext above). */
 	initialRow: string | null;
 }) {
@@ -138,10 +141,12 @@ function SettingsDialog({
  *  (portals render nothing under renderToStaticMarkup). */
 export function SettingsDialogBody({
 	onClose,
-	initialSection = "keys",
+	initialSection,
 	initialRow = null,
 }: {
 	onClose: () => void;
+	/** The section to open on. Absent: Providers on desktop, and on a
+	 *  phone the list of sections. */
 	initialSection?: SectionId;
 	/** The keys row to unfold on arrival (null = none). While-open
 	 *  retargets follow it exactly like initialSection below. */
@@ -184,20 +189,37 @@ export function SettingsDialogBody({
 			window.removeEventListener(MENU_CLOSE_EVENT, onClose);
 		};
 	}, []);
-	const [active, setActive] = useState<SectionId>(initialSection);
+	const [active, setActive] = useState<SectionId>(initialSection ?? "keys");
+	// Phones show one pane at a time: the list of sections, or the open
+	// section with a back button. Desktop always shows both.
+	const [showList, setShowList] = useState(initialSection === undefined);
+	const openSection = (id: SectionId) => {
+		setActive(id);
+		setShowList(false);
+	};
 	const [search, setSearch] = useState("");
+	// Keyboard shortcuts mean nothing on a phone: no Keyboard section.
+	const phone = usePhoneScreen();
+	const sections = phone ? SECTIONS.filter((s) => s.id !== "keyboard") : SECTIONS;
 	const q = search.trim().toLowerCase();
 	const matches = q
-		? SECTIONS.filter((s) => `${s.label} ${s.keywords}`.toLowerCase().includes(q))
-		: SECTIONS;
+		? sections.filter((s) => `${s.label} ${s.keywords}`.toLowerCase().includes(q))
+		: sections;
 	// A deep-link fired while the dialog is ALREADY open (first exercised by
 	// the wave-6 embedding picker's "Add a provider key first…" link — the
 	// picker itself died with wave 7, the mechanism is general) changes
 	// initialSection under our feet — follow it, or the link silently does
 	// nothing.
 	useEffect(() => {
+		if (initialSection === undefined) return;
 		setActive(initialSection);
+		setShowList(false);
 	}, [initialSection]);
+	// A newly opened section starts at its top, not where the last one
+	// was scrolled to.
+	useEffect(() => {
+		contentRef.current?.scrollTo({ top: 0 });
+	}, [active]);
 
 	// Fetch once per dialog mount. 200 {settings: null} is FIRST BOOT
 	// (no record = factory everything), not a failure — the error state is
@@ -282,7 +304,18 @@ export function SettingsDialogBody({
 		>
 			{/* Header — the app's quiet CMU title language. */}
 			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-				<h2 className="text-lg font-medium text-foreground">Settings</h2>
+				{!showList && (
+					<button
+						type="button"
+						data-testid="settings-back"
+						onClick={() => setShowList(true)}
+						className="-ml-2 flex h-9 items-center gap-0.5 rounded-lg pl-1 pr-2.5 text-[15px] font-medium text-foreground transition-colors hover:bg-(--pill) sm:hidden"
+					>
+						<ChevronLeftIcon aria-hidden className="size-5" />
+						Settings
+					</button>
+				)}
+				<h2 className={cn("text-lg font-medium text-foreground", !showList && "max-sm:hidden")}>Settings</h2>
 				<Hint label="Close" binding="escape" side="left">
 					<button
 						type="button"
@@ -303,20 +336,24 @@ export function SettingsDialogBody({
 				<nav
 					aria-label="Settings sections"
 					data-testid="settings-nav"
-					className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border p-4 max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:gap-1 max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b max-sm:p-2"
+					className={cn(
+						"flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border p-4 max-sm:min-h-0 max-sm:w-full max-sm:flex-1 max-sm:border-r-0",
+						!showList && "max-sm:hidden",
+					)}
 				>
 					{/* Search: narrows the list to sections whose settings match;
 					    Enter opens the first match. */}
-					<div className="relative mb-4 max-sm:mb-0 max-sm:w-40 max-sm:shrink-0">
+					<div className="relative mb-4 shrink-0">
 						<SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 						<input
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
 							onKeyDown={(e) => {
-								if (e.key === "Enter" && matches[0]) setActive(matches[0].id);
+								if (e.key === "Enter" && matches[0]) openSection(matches[0].id);
 							}}
 							placeholder="Search"
 							aria-label="Search settings"
+							enterKeyHint="go"
 							data-testid="settings-search"
 							className="h-10 w-full rounded-lg border border-border bg-(--pill) pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
 						/>
@@ -326,22 +363,24 @@ export function SettingsDialogBody({
 						const items = matches.filter((m) => m.group === group);
 						if (items.length === 0) return null;
 						return (
-							<div key={group} className="mb-4 max-sm:contents">
-								<div className="mb-1.5 px-2 text-[13px] text-muted-foreground max-sm:hidden">{group}</div>
+							<div key={group} className="mb-4">
+								<div className="mb-1.5 px-2 text-[13px] text-muted-foreground">{group}</div>
 								{items.map((s) => (
 									<button
 										key={s.id}
 										type="button"
 										data-testid={`settings-nav-${s.id}`}
-										aria-current={active === s.id}
+										aria-current={active === s.id ? "page" : undefined}
 										className={cn(
-											"flex h-10 w-full shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 text-left text-[15px] transition-colors max-sm:w-auto",
-											active === s.id ? "bg-(--pill) text-foreground" : "text-foreground/85 hover:bg-(--pill)/60 hover:text-foreground",
+											"flex h-10 w-full shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 text-left text-[15px] transition-colors max-sm:h-12 max-sm:text-foreground",
+											// The phone list has no "current" row: each one opens a page.
+											active === s.id ? "text-foreground sm:bg-(--pill)" : "text-foreground/85 hover:bg-(--pill)/60 hover:text-foreground",
 										)}
-										onClick={() => setActive(s.id)}
+										onClick={() => openSection(s.id)}
 									>
 										<s.Icon className="size-[18px] shrink-0 text-muted-foreground" aria-hidden />
 										{s.label}
+										<ChevronRightIcon className="ml-auto size-4 shrink-0 text-muted-foreground sm:hidden" aria-hidden />
 									</button>
 								))}
 							</div>
@@ -357,7 +396,7 @@ export function SettingsDialogBody({
 				    nothing may shift when the lock engages. */}
 				<div
 					ref={contentRef}
-					className="min-w-0 flex-1 overflow-y-auto"
+					className={cn("min-w-0 flex-1 overflow-y-auto", showList && "max-sm:hidden")}
 					data-testid="settings-content"
 				>
 					{error && (

@@ -7,6 +7,7 @@ import { joinDictation, useDictationTarget } from "@/components/dictation";
 import { THINKING_TEXTAREA, ThinkingField } from "@/components/thinking-field";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { cn } from "@/lib/utils";
+import { usePhoneScreen } from "@/lib/use-phone-screen";
 
 /**
  * The practice dock (practice sessions, owner design 2026-10-04): an
@@ -50,6 +51,7 @@ export interface PracticeDockProps {
 
 export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
+	const phone = usePhoneScreen(); // no key hints without a keyboard
 	// Ref MIRRORS the field ("nothing gets lost", the question-dock
 	// discipline): a submit resuming after `await finishDictation()` reads
 	// the tail, never a stale closure.
@@ -119,7 +121,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				testId="practice-thinking-field"
 				label="Thinking through the problem"
 				className="m-2 shrink-0"
-				hint={compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+				hint={compactionRunning ? "compacting session…" : phone ? undefined : "↵ submits · ⇧↵ newline"}
 				action={
 					<Button
 						type="button"
@@ -133,6 +135,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				}
 			>
 				<textarea
+					enterKeyHint="send"
 					value={thinking}
 					onChange={(e) => {
 						thinkingRef.current = e.target.value;

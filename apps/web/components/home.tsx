@@ -1,11 +1,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/lib/navigation";
+import { isPhoneScreen } from "@/lib/use-phone-screen";
 import { GraphView } from "@/components/graph-view";
 import { MinimalHome } from "@/components/minimal-home";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Onboarding, type OnboardingStep } from "@/components/onboarding";
-import { ComposerActions, NodePickerControl, SessionModeToggle, type SessionMode } from "@/components/composer-actions";
+import { ComposerActions, NodePickerControl, SessionModeMenu, type SessionMode } from "@/components/composer-actions";
 import { AttachMaterialControl, uploadMaterial } from "@/components/material-cards";
 import { XIcon } from "lucide-react";
 import { Composer, COMPOSER_SHELL } from "@/components/composer";
@@ -15,6 +16,10 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
 import type { TurnUsage } from "@/src/core";
+
+/** The graph's opening fit keeps clear of the floating toolbar above and
+ *  the composer dock below (composer, the row under it, and pb-5). */
+const GRAPH_FIT_INSETS = { top: 64, right: 24, bottom: 176, left: 24 };
 
 /** The first-run onboarding opened itself already this page load. */
 let firstRunSetupShown = false;
@@ -103,7 +108,9 @@ export function Home({
 			dictationWasActiveRef.current = true;
 		} else if (dictationWasActiveRef.current) {
 			dictationWasActiveRef.current = false;
-			topicInputRef.current?.focus();
+			// Not on a phone: the learner was talking, not typing — focus
+			// would pop the on-screen keyboard over the page.
+			if (!isPhoneScreen()) topicInputRef.current?.focus();
 		}
 	}, [dictation.active]);
 
@@ -185,7 +192,7 @@ export function Home({
 	};
 
 	return (
-		<div className="relative h-dvh">
+		<div className="relative h-full">
 			{/* The main view — full-bleed (owner, graph-view round 1): no
 			    padding on any side; it runs from the sidebar to the right edge
 			    and from the bottom to the top, under everything else. With
@@ -201,6 +208,7 @@ export function Home({
 						practiceSelection={pickedIds}
 						onPracticeSelectionChange={setPracticeProps}
 						onChainSelectClose={() => setChainSelectOpen(false)}
+						fitInsets={GRAPH_FIT_INSETS}
 					/>
 				) : (
 					<MinimalHome
@@ -272,6 +280,7 @@ export function Home({
 							onEscape={dictation.active ? dictation.cancel : undefined}
 							placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
 							dictation={dictation}
+							leading={<AttachMaterialControl onPicked={(files) => setPendingFiles((prev) => [...prev, ...files])} pasteTarget={topicInputRef} />}
 						/>
 					</div>
 					{/* Same as the chat view's under-composer stats bar (owner) — no
@@ -282,8 +291,7 @@ export function Home({
 						turns={[] as TurnUsage[]}
 						leadingSlot={
 							<div className="flex items-center gap-2">
-								<SessionModeToggle mode={mode} onChange={setMode} />
-								<AttachMaterialControl onPicked={(files) => setPendingFiles((prev) => [...prev, ...files])} pasteTarget={topicInputRef} />
+								<SessionModeMenu mode={mode} onChange={setMode} />
 								{pendingFiles.length > 0 && (
 									<span data-testid="home-materials" className="flex items-center gap-1 rounded-full bg-(--pill) py-0.5 pl-2.5 pr-0.5 text-sm text-foreground">
 										{pendingFiles.length} {pendingFiles.length === 1 ? "file" : "files"} attached

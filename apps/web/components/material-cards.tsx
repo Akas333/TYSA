@@ -170,6 +170,7 @@ export function AttachMaterialControl({
 	onAttached,
 	onPicked,
 	pasteTarget,
+	compact = false,
 }: {
 	chatId?: string;
 	folderId?: string;
@@ -181,6 +182,9 @@ export function AttachMaterialControl({
 	 *  screenshot, a copied image or a file copied in Finder) attach
 	 *  exactly like a pick. Text-only pastes stay native. */
 	pasteTarget?: React.RefObject<HTMLElement | null>;
+	/** A small round button for header rows; the default matches the
+	 *  composer's own buttons (send, mic), where it leads the text. */
+	compact?: boolean;
 }) {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const [busy, setBusy] = useState(false);
@@ -239,9 +243,15 @@ export function AttachMaterialControl({
 				aria-label="Attach material"
 				disabled={disabled || busy}
 				onClick={() => inputRef.current?.click()}
-				className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-accent disabled:opacity-50 ${error ? "text-red-400" : "text-muted-foreground hover:text-foreground"}`}
+				className={`inline-flex shrink-0 items-center justify-center transition-colors disabled:opacity-50 ${
+					compact ? "size-8 rounded-full hover:bg-accent" : "size-9 rounded-xl hover:bg-(--pill)"
+				} ${error ? "text-red-400" : "text-muted-foreground hover:text-foreground"}`}
 			>
-				{busy ? <LoaderCircleIcon className="size-4 animate-spin" /> : <PaperclipIcon className="size-4" />}
+				{busy ? (
+					<LoaderCircleIcon className={`${compact ? "size-4" : "size-[18px]"} animate-spin`} />
+				) : (
+					<PaperclipIcon className={compact ? "size-4" : "size-[18px]"} />
+				)}
 			</button>
 			<input
 				ref={inputRef}
@@ -285,7 +295,7 @@ export function FolderMaterials({ folderId, isCourse }: { folderId: string; isCo
 		<div data-testid="folder-materials">
 			<div className="flex items-center justify-between gap-2">
 				<div className="text-sm font-semibold text-foreground">{isCourse ? "Course material" : "Folder material"}</div>
-				<AttachMaterialControl folderId={folderId} onAttached={() => void refresh()} />
+				<AttachMaterialControl compact folderId={folderId} onAttached={() => void refresh()} />
 			</div>
 			<p className="mb-2 text-xs text-muted-foreground">Every chat in this folder can read it.</p>
 			{materials === null ? (

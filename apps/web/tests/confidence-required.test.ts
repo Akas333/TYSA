@@ -32,7 +32,9 @@ function render(draft: { confidenceSet?: boolean; dontKnow?: boolean }) {
 	);
 }
 
-const submitDisabled = (html: string) => /<button[^>]*disabled=""[^>]*>Submit answer/.test(html);
+// Blocked either way: disabled outright, or (only the confidence missing)
+// aria-disabled — the click then nudges the confidence row instead of sending.
+const submitDisabled = (html: string) => /<button[^>]*(?:\sdisabled=""|aria-disabled="true")[^>]*>Submit answer/.test(html);
 
 describe("confidence is required", () => {
 	it("blocks Submit and asks how sure until confidence is set", () => {

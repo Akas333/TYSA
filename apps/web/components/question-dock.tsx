@@ -9,6 +9,7 @@ import { useVoiceThinking } from "@/components/voice-thinking";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
+import { usePhoneScreen } from "@/lib/use-phone-screen";
 import {
 	buildAnswer,
 	repairMathForDisplay,
@@ -412,6 +413,8 @@ function QuestionDockForm({
 	const needsConfidence = kind === "quiz" && !sel.dontKnow && !confSet;
 	// Hands-free is listening into THIS card: ask for confidence out loud.
 	const voice = useVoiceThinking();
+	// No keyboard on a phone: no key hints.
+	const phone = usePhoneScreen();
 	const listeningHere = voice?.listening === true && dictationClaim;
 	const askToSayConfidence = listeningHere && needsConfidence && picked;
 	const canSubmit =
@@ -935,7 +938,9 @@ function QuestionDockForm({
 							? "compacting session…"
 							: needsConfidence && picked
 								? "Set how sure you are to submit"
-								: "↵ submits · ⇧↵ newline"
+								: phone
+									? undefined
+									: "↵ submits · ⇧↵ newline"
 					}
 					mic={dictationClaim}
 					listeningPrompt={
@@ -946,8 +951,12 @@ function QuestionDockForm({
 					action={
 						<Button
 							type="submit"
-							disabled={!canSubmit || compactionRunning}
-							className="h-9 rounded-xl px-3.5 text-sm font-medium"
+							// Only the confidence missing: the click stays live so
+							// it lights the confidence row like Enter does — a dead
+							// button here read as a broken card.
+							disabled={(!canSubmit && !(picked && needsConfidence)) || compactionRunning}
+							aria-disabled={(picked && needsConfidence) || undefined}
+							className={cn("h-9 rounded-xl px-3.5 text-sm font-medium", picked && needsConfidence && "opacity-50")}
 						>
 							Submit answer
 						</Button>
@@ -978,12 +987,14 @@ function QuestionDockForm({
 								}
 							}}
 							placeholder="Type your answer…"
+							enterKeyHint="send"
 							rows={1}
 							className={cn(THINKING_TEXTAREA, "min-h-10")}
 						/>
 					) : (
 						<textarea
 							ref={thinkingRef}
+							enterKeyHint="send"
 							value={thinking}
 							onChange={(e) => {
 								thinkingTextRef.current = e.target.value;

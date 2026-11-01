@@ -70,6 +70,7 @@ import { CoverageRing } from "@/components/extraction-coverage";
 import { SWITCH_TO_PRACTICE_TEXT } from "@/components/artifacts/probe-done-card";
 import { CourseContextCard, CourseStartBar, courseEntryHref, courseStartText, useCourseNext } from "@/components/course-cards";
 import { useRouter } from "@/lib/navigation";
+import { isPhoneScreen, usePhoneScreen } from "@/lib/use-phone-screen";
 import { AttachMaterialControl, MaterialCard, type MaterialMarkerData } from "@/components/material-cards";
 import {
 	activeProblemOf,
@@ -729,7 +730,9 @@ export function Chat({
 			dictationWasActiveRef.current = true;
 		} else if (dictationWasActiveRef.current) {
 			dictationWasActiveRef.current = false;
-			composerInputRef.current?.focus();
+			// Not on a phone: the learner was talking, not typing — focus
+			// would pop the on-screen keyboard over the page.
+			if (!isPhoneScreen()) composerInputRef.current?.focus();
 		}
 	}, [dictation.active]);
 
@@ -769,6 +772,8 @@ export function Chat({
 			? ((nativeMessages[0] as { details?: unknown }).details as CourseContextData)
 			: null;
 	const courseNext = useCourseNext(course?.role === "concept" ? course.folderId : undefined, course?.conceptId);
+	// No keyboard on a phone: the placeholder drops its key hints.
+	const phone = usePhoneScreen();
 	const nextReady =
 		(kind === "practice" || (style === "textbook" && stage !== "done")) &&
 		!pending &&
@@ -1379,7 +1384,7 @@ export function Chat({
 		    chip) spans from the left sidebar's edge to the panel's edge. The
 		    dock overlays the column bottom (outside the scroller); a spacer in
 		    the transcript reserves its height. */}
-		<div className="flex h-dvh">
+		<div className="flex h-full">
 			<div className="flex min-w-0 flex-1 flex-col">
 				{/* The top bar is its own block (owner, top-fade round 4): in flow
 				    above the scroller on the plain page background — no gradient. Its
@@ -1909,7 +1914,15 @@ export function Chat({
 							// applies.
 							nextProblem={nextReady}
 							onNext={sendNext}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : "↵ to send — ask, answer, or steer the lesson"}
+							placeholder={
+								nextReady
+									? phone
+										? "Ask, or tap Next problem"
+										: "Ask anything, or press Enter for the next one."
+									: phone
+										? "Ask, answer, or steer…"
+										: "↵ to send — ask, answer, or steer the lesson"
+							}
 							dictation={dictation}
 							// Materials (2026-10-29): attach textbook pages, notes or
 							// problem sheets; the card lands in the transcript.

@@ -162,6 +162,8 @@ export interface RendererCallbacks {
 
 const LABEL_SIZE = 12; // the reference label size the wrap-width ratio is taken against
 const LABEL_WEIGHT = "500";
+/** Cluster names draw semibold; their wrap measures at the same weight. */
+const CLUSTER_LABEL_WEIGHT = "600";
 
 /** Region (cluster) labels — wave 7's session names made the labels
  *  LONG: imported-file paths and renamed chat titles. They wrap at a
@@ -518,22 +520,111 @@ export function labelAlpha(
  *  unclamped k, and the node lands off-screen. */
 export const MIN_FIT_SPAN = 160;
 
-/** The camera transform that frames `bbox` in a w×h viewport with padding. */
+/** Screen margins a fit keeps clear: chrome the caller floats over the
+ *  canvas (toolbar, composer) plus breathing room. */
+export interface FitInsets {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+}
+
+/** A screen-fixed label a fit keeps in frame: anchored at world (x, y),
+ *  centred horizontally, rising `height` screen px above the anchor. */
+export interface FitLabel {
+	x: number;
+	y: number;
+	halfWidth: number;
+	height: number;
+}
+
+/** Room (px) a fit always leaves for the graph: insets shrink
+ *  proportionally on a viewport too small to honor them in full. */
+const MIN_FIT_ROOM = 80;
+/** Cluster names may zoom a fit out to this share of the nodes-only zoom,
+ *  no further: on a phone, fitting every name would shrink the graph to a
+ *  speck, so a name may run off the edge instead. */
+const MIN_LABEL_ZOOM_SHARE = 0.6;
+
+function shrinkInsets(a: number, b: number, size: number): [number, number] {
+	if (size - a - b >= MIN_FIT_ROOM || a + b <= 0) return [a, b];
+	const scale = Math.max(0, size - MIN_FIT_ROOM) / (a + b);
+	return [a * scale, b * scale];
+}
+
+/** The translate range on one axis at zoom k: every item (a world
+ *  coordinate plus screen px before/after it) must land in [lo, hi]. */
+function translateRange(
+	items: readonly { a: number; before: number; after: number }[],
+	k: number,
+	lo: number,
+	hi: number,
+): [number, number] {
+	let min = -Infinity;
+	let max = Infinity;
+	for (const it of items) {
+		min = Math.max(min, lo + it.before - it.a * k);
+		max = Math.min(max, hi - it.after - it.a * k);
+	}
+	return [min, max];
+}
+
+/** The camera transform that frames `bbox` in a w×h viewport, clear of
+ *  `padding` (one number, or per-side insets). Screen-fixed `labels`
+ *  (cluster names) are kept in frame too: their size doesn't scale with
+ *  the zoom, so the largest k that still fits them is searched for. */
 export function fitTransform(
 	bbox: { minX: number; maxX: number; minY: number; maxY: number },
 	w: number,
 	h: number,
-	padding: number,
+	padding: number | FitInsets,
+	labels: readonly FitLabel[] = [],
 ): { x: number; y: number; k: number } {
+	const p = typeof padding === "number" ? { top: padding, right: padding, bottom: padding, left: padding } : padding;
+	const [left, right] = shrinkInsets(p.left, p.right, w);
+	const [top, bottom] = shrinkInsets(p.top, p.bottom, h);
 	// An axis without extent doesn't constrain the zoom (nodes on a line
 	// fit by their length); with neither axis spread, frame MIN_FIT_SPAN.
 	let bw: number | null = bbox.maxX - bbox.minX >= 1 ? bbox.maxX - bbox.minX : null;
 	let bh: number | null = bbox.maxY - bbox.minY >= 1 ? bbox.maxY - bbox.minY : null;
 	if (bw === null && bh === null) bw = bh = MIN_FIT_SPAN;
-	const k = Math.min(bw === null ? Infinity : (w - 2 * padding) / bw, bh === null ? Infinity : (h - 2 * padding) / bh);
-	const cx = (bbox.minX + bbox.maxX) / 2;
-	const cy = (bbox.minY + bbox.maxY) / 2;
-	return { x: w / 2 - cx * k, y: h / 2 - cy * k, k };
+	const nodeK = Math.min(
+		bw === null ? Infinity : (w - left - right) / bw,
+		bh === null ? Infinity : (h - top - bottom) / bh,
+	);
+	const xs = [
+		{ a: bbox.minX, before: 0, after: 0 },
+		{ a: bbox.maxX, before: 0, after: 0 },
+		...labels.map((l) => ({ a: l.x, before: l.halfWidth, after: l.halfWidth })),
+	];
+	const ys = [
+		{ a: bbox.minY, before: 0, after: 0 },
+		{ a: bbox.maxY, before: 0, after: 0 },
+		...labels.map((l) => ({ a: l.y, before: l.height, after: 0 })),
+	];
+	const fits = (k: number) => {
+		const [x0, x1] = translateRange(xs, k, left, w - right);
+		const [y0, y1] = translateRange(ys, k, top, h - bottom);
+		return x0 <= x1 && y0 <= y1;
+	};
+	let k = nodeK;
+	if (labels.length > 0 && !fits(k)) {
+		// Bisect for the largest zoom that fits, down to the floor; when
+		// even the floor can't fit every name, the floor is the best try.
+		let lo = nodeK * MIN_LABEL_ZOOM_SHARE;
+		let hi = nodeK;
+		if (fits(lo)) {
+			for (let i = 0; i < 20; i++) {
+				const mid = (lo + hi) / 2;
+				if (fits(mid)) lo = mid;
+				else hi = mid;
+			}
+		}
+		k = lo;
+	}
+	const [x0, x1] = translateRange(xs, k, left, w - right);
+	const [y0, y1] = translateRange(ys, k, top, h - bottom);
+	return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, k };
 }
 
 /** The arrowhead geometry for a directed edge a→b: shaft endpoints
@@ -686,6 +777,11 @@ export class GraphCanvasRenderer {
 	/** World-space bounds of the current nodes — fit() and the resize-time
 	 *  kFit refresh share it (computed once per setData, not per resize). */
 	private worldBBox: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+	/** Screen margins fit() keeps clear (the caller's floating chrome). */
+	private fitInsets: FitInsets = { top: 40, right: 40, bottom: 40, left: 40 };
+	/** The camera came from fit() and the user hasn't moved it since: the
+	 *  opening warm-up keeps the settling graph framed until it rests. */
+	private autoFrame = false;
 
 	private data: CanvasData | null = null;
 	/** id -> node for the current data (avoids O(n^2) scans). */
@@ -785,7 +881,7 @@ export class GraphCanvasRenderer {
 		 *  present it REPLACES the first-open fit; the graph opens exactly
 		 *  where the user left it (2026-09-15: a default zoom exists only
 		 *  on first open, ever). Invalid shapes fall back to fit. */
-		initialCamera?: { k: number; x: number; y: number } | null,
+		initialCamera?: { k: number; x: number; y: number; w?: number; h?: number } | null,
 	) {
 		this.canvas = canvas;
 		const ctx = canvas.getContext("2d");
@@ -797,7 +893,9 @@ export class GraphCanvasRenderer {
 		// transform change just marks dirty (draws happen in OUR loop).
 		this.zoomBehavior = zoom<HTMLCanvasElement, unknown>()
 			.scaleExtent([0.02, 40])
-			.on("zoom", ({ transform }) => {
+			.on("zoom", ({ transform, sourceEvent }) => {
+				// A pan or pinch (sourceEvent set) takes the camera over.
+				if (sourceEvent) this.autoFrame = false;
 				this.transform = transform;
 				this.markDirty();
 				// The transform doubles as the persistence payload (view state).
@@ -833,9 +931,24 @@ export class GraphCanvasRenderer {
 		) {
 			this.hasFit = true;
 			this.checkRestoredCamera = true;
+			// Saved in a differently sized viewport (another window width,
+			// a phone): keep the same world point at the centre, and on a
+			// much smaller screen zoom out so about the same area shows.
+			let { x, y, k } = initialCamera;
+			const { w, h } = initialCamera;
+			const cw = canvas.clientWidth;
+			const ch = canvas.clientHeight;
+			if (cw >= 10 && ch >= 10 && typeof w === "number" && typeof h === "number") {
+				const wx = (w / 2 - x) / k;
+				const wy = (h / 2 - y) / k;
+				const ratio = Math.min(cw / w, ch / h);
+				if (ratio < 0.75) k = Math.max(k * ratio, 0.02);
+				x = cw / 2 - wx * k;
+				y = ch / 2 - wy * k;
+			}
 			select(canvas).call(
 				this.zoomBehavior.transform,
-				zoomIdentity.translate(initialCamera.x, initialCamera.y).scale(initialCamera.k),
+				zoomIdentity.translate(x, y).scale(k),
 			);
 		}
 
@@ -850,7 +963,8 @@ export class GraphCanvasRenderer {
 			const wy = (prevH / 2 - ty) / k;
 			this.syncSize();
 			if (this.refitIfRestoredCameraMissesGraph()) return;
-			if (!this.hasFit) this.fit(); // first real size → fit once
+			// First real size → fit once; an untouched opening camera re-frames.
+			if (!this.hasFit || this.autoFrame) this.fit();
 			else {
 				this.refreshFitZoom(); // the gate's "1×" is viewport-bound
 				// Center-anchor (2026-09-17, owner): same world point under
@@ -879,22 +993,8 @@ export class GraphCanvasRenderer {
 		this.data = data;
 		this.nodeById = new Map(data.nodes.map((n) => [n.id, n]));
 		if (data.colors.background) this.pageBackground = data.colors.background;
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-		for (const n of data.nodes) {
-			if (n.x < minX) minX = n.x;
-			if (n.y < minY) minY = n.y;
-			if (n.x > maxX) maxX = n.x;
-			if (n.y > maxY) maxY = n.y;
-		}
-		this.worldBBox = { minX, maxX, minY, maxY };
-		if (!this.hasFit && data.nodes.length > 0) this.fit();
-		// The camera may be user-restored (constructor initialCamera): refit
-		// if it shows none of the graph; otherwise the gate's "1×" reference
-		// still needs the fresh bbox's fit zoom.
-		else if (!this.refitIfRestoredCameraMissesGraph()) this.refreshFitZoom();
+		this.worldBBox = this.nodeBBox();
+		const { minX, maxX, minY, maxY } = this.worldBBox;
 		// Rebuild the live sim around the fresh nodes. New data means the
 		// server spoke (merge or refetch); any pending commit is moot and
 		// the graph is at rest until the next drag.
@@ -916,13 +1016,29 @@ export class GraphCanvasRenderer {
 			this.simActive = true;
 		}
 		this.geoVersion++; // new data → rebuild world geometry
+		// After the neighbours rebuild: the fit measures cluster labels,
+		// which sit on degree-sized discs.
+		if (!this.hasFit && data.nodes.length > 0) this.fit();
+		// The camera may be user-restored (constructor initialCamera): refit
+		// if it shows none of the graph; otherwise the gate's "1×" reference
+		// still needs the fresh bbox's fit zoom.
+		else if (!this.refitIfRestoredCameraMissesGraph()) this.refreshFitZoom();
 		this.markDirty();
 	}
 
 	setSettings(settings: GraphRenderSettings): void {
 		this.settings = settings;
 		this.geoVersion++; // sizes/wrap width changed → rebuild geometry
+		// Label sizes are known now: re-frame an untouched opening camera.
+		if (this.autoFrame) this.fit();
 		this.markDirty();
+	}
+
+	/** The caller's floating chrome changed: re-frame an untouched camera. */
+	setFitInsets(insets: FitInsets): void {
+		this.fitInsets = insets;
+		if (this.autoFrame) this.fit();
+		else this.refreshFitZoom();
 	}
 
 	/** Dev tuning for region rendering (session-only, never persisted):
@@ -983,7 +1099,7 @@ export class GraphCanvasRenderer {
 		}
 		const ctx = this.ctx;
 		const prevFont = ctx.font;
-		ctx.font = `${LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
+		ctx.font = `${CLUSTER_LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
 		const changed = applyClusterLabels(
 			data.clusters,
 			this.regionMeta,
@@ -1032,13 +1148,52 @@ export class GraphCanvasRenderer {
 		const w = this.canvas.clientWidth;
 		const h = this.canvas.clientHeight;
 		if (w < 10 || h < 10) return; // layout not ready yet; the ResizeObserver retries
-		const t = fitTransform(this.worldBBox, w, h, 40);
+		const t = fitTransform(this.worldBBox, w, h, this.fitInsets, this.fitLabels());
 		this.kFit = t.k;
 		this.hasFit = true;
+		this.autoFrame = true;
 		select(this.canvas).call(
 			this.zoomBehavior.transform,
 			zoomIdentity.translate(t.x, t.y).scale(t.k),
 		);
+	}
+
+	/** World bounds of the current node positions. */
+	private nodeBBox(): { minX: number; maxX: number; minY: number; maxY: number } {
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const n of this.data?.nodes ?? []) {
+			if (n.x < minX) minX = n.x;
+			if (n.y < minY) minY = n.y;
+			if (n.x > maxX) maxX = n.x;
+			if (n.y > maxY) maxY = n.y;
+		}
+		return { minX, maxX, minY, maxY };
+	}
+
+	/** The cluster names' screen boxes for fit(): without them a name over
+	 *  an edge cluster is cut off by the viewport. */
+	private fitLabels(): FitLabel[] {
+		const data = this.data;
+		const settings = this.settings;
+		if (!data || !settings || !settings.clusterLabels) return [];
+		if (this.builtVersion !== this.geoVersion) this.buildGeometry();
+		const ctx = this.ctx;
+		const prevFont = ctx.font;
+		ctx.font = `${CLUSTER_LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
+		const lineH = settings.clusterLabelSize * REGION_LABEL_LINE_HEIGHT;
+		const out: FitLabel[] = [];
+		for (const rm of this.regionMeta) {
+			if (!rm.lines || rm.lines.length === 0) continue;
+			let width = 0;
+			for (const line of rm.lines) width = Math.max(width, ctx.measureText(line).width);
+			// +2: the page-coloured outline stroke around each glyph.
+			out.push({ x: rm.cx, y: rm.cy, halfWidth: width / 2 + 2, height: CLUSTER_LABEL_GAP + rm.lines.length * lineH });
+		}
+		ctx.font = prevFont;
+		return out;
 	}
 
 	/** Refresh the label-gate's "1×" reference from the current bbox +
@@ -1048,7 +1203,7 @@ export class GraphCanvasRenderer {
 		if (!this.worldBBox) return;
 		const w = this.canvas.clientWidth;
 		const h = this.canvas.clientHeight;
-		if (w >= 10 && h >= 10) this.kFit = fitTransform(this.worldBBox, w, h, 40).k;
+		if (w >= 10 && h >= 10) this.kFit = fitTransform(this.worldBBox, w, h, this.fitInsets).k;
 	}
 
 	destroy(): void {
@@ -1074,6 +1229,7 @@ export class GraphCanvasRenderer {
 	 *  tick loop (cursor-anchored). Sensitivity formula is d3-zoom's own. */
 	private onWheel = (e: WheelEvent) => {
 		e.preventDefault();
+		this.autoFrame = false;
 		const delta = -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002);
 		const { x, y } = this.eventPos(e);
 		const current = this.zoomTarget?.k ?? this.transform.k;
@@ -1136,6 +1292,7 @@ export class GraphCanvasRenderer {
 			}
 			this.dragId = node.id;
 			this.dragOrigin = pos;
+			this.autoFrame = false;
 			const n = this.simById.get(node.id);
 			if (n) {
 				n.fx = n.x;
@@ -1300,9 +1457,16 @@ export class GraphCanvasRenderer {
 			}
 		}
 		this.geoVersion++; // positions changed → geometry rebuild in draw()
+		// The opening warm-up spreads the graph past its first fit: follow
+		// it until the user takes the camera.
+		if (this.autoFrame && !this.dragId) {
+			this.worldBBox = this.nodeBBox();
+			this.fit();
+		}
 		// Settled (drag released long ago, alpha annealed away)?
 		if (!this.dragId && this.sim.alpha() < SIM_SETTLE_ALPHA) {
 			this.simActive = false;
+			this.autoFrame = false;
 			this.scheduleCommit();
 			return false;
 		}
@@ -1471,7 +1635,7 @@ export class GraphCanvasRenderer {
 		const isVisible = (id: string) => !this.visible || this.visible.has(id);
 		const ctx = this.ctx;
 		const prevFont = ctx.font;
-		ctx.font = `${LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
+		ctx.font = `${CLUSTER_LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
 		for (const cluster of data.clusters) {
 			let members = 0;
 			let sumX = 0;
@@ -1658,7 +1822,7 @@ export class GraphCanvasRenderer {
 		if (settings) {
 			const ctx = this.ctx;
 			const prevFont = ctx.font;
-			ctx.font = `${LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
+			ctx.font = `${CLUSTER_LABEL_WEIGHT} ${settings.clusterLabelSize}px ${data.fontFamily}`;
 			for (const rm of this.regionMeta) {
 				rm.lines = rm.label
 					? wrapRegionLabel(rm.label, REGION_LABEL_MAX_WIDTH, REGION_LABEL_MAX_LINES, (s) => ctx.measureText(s).width)
@@ -1976,7 +2140,7 @@ export class GraphCanvasRenderer {
 		if (settings.clusterLabels && clusterAlpha > 0.01) {
 			const size = settings.clusterLabelSize / k;
 			const lineH = size * REGION_LABEL_LINE_HEIGHT;
-			ctx.font = `600 ${size}px ${data.fontFamily}`;
+			ctx.font = `${CLUSTER_LABEL_WEIGHT} ${size}px ${data.fontFamily}`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "bottom";
 			ctx.lineJoin = "round";

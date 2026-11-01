@@ -69,7 +69,7 @@ import { Link } from "@/lib/navigation";
 import { CheckIcon, FileTextIcon, ListTreeIcon, Loader2Icon, PlusIcon, SearchIcon, SettingsIcon, UploadIcon } from "lucide-react";
 import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { planCostLabel } from "@/components/usage-format";
-import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
+import { GraphCanvasRenderer, type FitInsets, type GraphRenderSettings } from "./graph-canvas.ts";
 import { SphereBackdrop } from "./sphere-backdrop.tsx";
 
 
@@ -115,6 +115,10 @@ const NODE_COLOR_TOKEN = "--muted-foreground";
 /** Per-device graph camera persistence (zoom+pan view state). v1 in the
  *  key: the stored shape is the renderer's d3 transform {k, x, y}. */
 const CAMERA_STORAGE_KEY = "lh.graph.camera.v1";
+
+/** The opening fit's margins with no page chrome below: the floating
+ *  toolbar's height on top, breathing room elsewhere. */
+const DEFAULT_FIT_INSETS: FitInsets = { top: 64, right: 24, bottom: 24, left: 24 };
 
 // ---- Render settings (the settings-panel controls) ------------------------
 //
@@ -869,7 +873,12 @@ export function GraphView({
 	practiceSelection,
 	onPracticeSelectionChange,
 	onChainSelectClose,
+	fitInsets = DEFAULT_FIT_INSETS,
 }: {
+	/** Screen margins the opening fit keeps clear: the toolbar above, plus
+	 *  whatever the page floats over the canvas (home: the composer).
+	 *  Pass a stable object — a new one re-frames an untouched camera. */
+	fitInsets?: FitInsets;
 	/** Practice mode: a click on a proposition picks it (again: un-picks)
 	 *  — the graph itself is a picker, not only the chain table. Shift+click
 	 *  picks in every mode. */
@@ -1234,6 +1243,11 @@ export function GraphView({
 	// away (the empty-graph placeholder replaces it). The callbacks are
 	// created once and read through refs, so they never go stale.
 	const isEmpty = snapshot === null || snapshot.nodes.length === 0;
+	const fitInsetsRef = useRef(fitInsets);
+	fitInsetsRef.current = fitInsets;
+	useEffect(() => {
+		rendererRef.current?.setFitInsets(fitInsets);
+	}, [fitInsets]);
 	useEffect(() => {
 		if (isEmpty) return;
 		const canvas = canvasRef.current;
@@ -1242,17 +1256,24 @@ export function GraphView({
 		// user left it — zoom AND pan, in localStorage (per-device view
 		// state, deliberately NOT the server settings ledger). Absent or
 		// corrupt → undefined → the renderer fits on first open, ever.
-		let initialCamera: { k: number; x: number; y: number } | null = null;
+		let initialCamera: { k: number; x: number; y: number; w?: number; h?: number } | null = null;
 		try {
 			const stored = localStorage.getItem(CAMERA_STORAGE_KEY);
 			if (stored) {
-				const parsed = JSON.parse(stored) as { k?: unknown; x?: unknown; y?: unknown };
+				const parsed = JSON.parse(stored) as { k?: unknown; x?: unknown; y?: unknown; w?: unknown; h?: unknown };
 				if (
 					typeof parsed.k === "number" && Number.isFinite(parsed.k) && parsed.k > 0 &&
 					typeof parsed.x === "number" && Number.isFinite(parsed.x) &&
 					typeof parsed.y === "number" && Number.isFinite(parsed.y)
-				)
+				) {
 					initialCamera = { k: parsed.k, x: parsed.x, y: parsed.y };
+					// The viewport it was saved in (absent on older entries):
+					// the renderer keeps the same world point centred.
+					if (typeof parsed.w === "number" && typeof parsed.h === "number" && parsed.w > 0 && parsed.h > 0) {
+						initialCamera.w = parsed.w;
+						initialCamera.h = parsed.h;
+					}
+				}
 			}
 		} catch {
 			// Corrupt entry → treat as absent; the renderer fits.
@@ -1260,8 +1281,9 @@ export function GraphView({
 		// Debounced camera writes: a pan emits hundreds of transforms per
 		// second; one trailing write per quiet spell is plenty.
 		let cameraTimer: ReturnType<typeof setTimeout> | null = null;
-		let lastCamera: { k: number; x: number; y: number } | null = null;
-		const persistCamera = (t: { k: number; x: number; y: number }) => {
+		let lastCamera: { k: number; x: number; y: number; w: number; h: number } | null = null;
+		const persistCamera = ({ k, x, y }: { k: number; x: number; y: number }) => {
+			const t = { k, x, y, w: canvas.clientWidth, h: canvas.clientHeight };
 			lastCamera = t;
 			if (cameraTimer) clearTimeout(cameraTimer);
 			cameraTimer = setTimeout(() => {
@@ -1320,6 +1342,7 @@ export function GraphView({
 			},
 		};
 		const renderer = new GraphCanvasRenderer(canvas, callbacks, initialCamera);
+		renderer.setFitInsets(fitInsetsRef.current);
 		rendererRef.current = renderer;
 		return () => {
 			rendererRef.current = null;

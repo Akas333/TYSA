@@ -2,6 +2,7 @@
 import { useCallback } from "react";
 import { joinDictation, useDictationTarget } from "@/components/dictation";
 import { THINKING_TEXTAREA, ThinkingField } from "@/components/thinking-field";
+import { usePhoneScreen } from "@/lib/use-phone-screen";
 
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
@@ -40,6 +41,7 @@ export function ReadingThinkingField({
 	/** Sits under the question card (the check is still closed). */
 	below?: boolean;
 }) {
+	const phone = usePhoneScreen(); // no key hints without a keyboard
 	useDictationTarget(
 		useCallback(
 			(t: string) => {
@@ -59,10 +61,12 @@ export function ReadingThinkingField({
 					? "What stands out from the reading? Talk it through before you see the options"
 					: "Anything else from the reading? Just keep talking"
 			}
-			hint={onOpen ? "↵ shows the options · ⇧↵ newline" : undefined}
+			hint={onOpen && !phone ? "↵ shows the options · ⇧↵ newline" : undefined}
 			mic={claim}
 		>
 			<textarea
+				// Enter reveals the options while the check waits closed.
+				enterKeyHint={onOpen ? "next" : "enter"}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source

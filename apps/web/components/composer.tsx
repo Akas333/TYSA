@@ -2,6 +2,7 @@
 import { ArrowRightIcon, CircleStopIcon, CornerDownLeftIcon } from "lucide-react";
 import { DictationButton, DictationMeter, type Dictation } from "@/components/dictation";
 import { cn } from "@/lib/utils";
+import { usePhoneScreen } from "@/lib/use-phone-screen";
 
 /**
  * The composer bar — ONE row inside a rounded pill: an optional leading
@@ -72,7 +73,8 @@ export function Composer({
 	nextProblem?: boolean;
 	/** The signal's dispatcher (send({type:"next"})). */
 	onNext?: () => void;
-	/** A control before the text (the draft's "+ pick nodes"). */
+	/** Controls before the text: the paperclip, and the draft's
+	 *  "+ pick nodes" in practice mode. */
 	leading?: React.ReactNode;
 	/** The page's dictation engine: adds the meter + mic to the row. */
 	dictation?: Dictation;
@@ -84,6 +86,9 @@ export function Composer({
 		else if (action === "next") onNext?.();
 	};
 	const stopMode = busy && !canSend;
+	// A phone's keyboard covers half the screen: it opens when the learner
+	// taps the field, never on page load.
+	const phone = usePhoneScreen();
 	return (
 		<form
 			data-testid="composer"
@@ -93,7 +98,7 @@ export function Composer({
 				act();
 			}}
 		>
-			{leading ? <div className="flex shrink-0 items-center">{leading}</div> : null}
+			{leading ? <div className="flex h-9 shrink-0 items-center gap-0.5">{leading}</div> : null}
 			<textarea
 				ref={inputRef}
 				value={value}
@@ -114,7 +119,9 @@ export function Composer({
 					}
 				}}
 				placeholder={placeholder}
-				autoFocus={autoFocus}
+				autoFocus={autoFocus && !phone}
+				// The on-screen keyboard's Enter key reads "Send": Enter sends.
+				enterKeyHint="send"
 				rows={1}
 				className={cn(
 					"field-sizing-content lh-input max-h-48 min-h-9 flex-1 resize-none bg-transparent py-2 outline-none placeholder:text-muted-foreground/70",
