@@ -256,7 +256,7 @@ export async function handleChatInput(
 		noDispatch: (kind) => requestCycle?.noDispatch(kind),
 	};
 	let conversationEngine: PiEngine;
-	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
+	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle, "long"); }
 	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(

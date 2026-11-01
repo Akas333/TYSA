@@ -3,6 +3,7 @@ import {
 	createModels,
 	getSupportedThinkingLevels,
 	type Api,
+	type CacheRetention,
 	type Model,
 	type Models,
 	type StreamFunction,
@@ -102,8 +103,15 @@ function defaultThinkingLevel(model: Model<Api>): ThinkingLevel {
  *  2026-09-20): provider-aware catalog lookup + thinking clamp. The API
  *  key is resolved by pi-ai itself from the environment per request (the
  *  keys seam reflects file-saved keys into env), so the engine never
- *  hardcodes OpenRouter's. */
-export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (() => boolean) = true, lifecycle?: ChatGPTDispatchLifecycle): PiEngine {
+ *  hardcodes OpenRouter's.
+ *
+ *  cacheRetention: unset keeps pi-ai's short default (5 minutes on
+ *  Anthropic). The lesson chat passes "long" (1 hour on Anthropic, 24
+ *  hours where OpenAI supports it): learners often pause past 5 minutes
+ *  to read or answer, and a lapsed cache resends the whole history at the
+ *  write price. One-shot background calls never reuse their prefix, so
+ *  they keep the cheaper short write. */
+export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (() => boolean) = true, lifecycle?: ChatGPTDispatchLifecycle, cacheRetention?: CacheRetention): PiEngine {
 	const models: Models = piModels();
 	const nativeId = nativeSubscriptionId(spec.provider);
 	const model = spec.provider === "chatgpt" ? chatGPTModel(spec.id) : nativeId ? nativeSubscriptionModel(spec.provider, spec.id) : models.getModel(spec.provider, spec.id);
@@ -127,7 +135,7 @@ export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (
 			// API-key streams resend once without reasoning another key or
 			// account was issued (foreign-reasoning.ts).
 			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : nativeId ? nativeSubscriptionStream(models.getProvider(nativeId)!, purpose, lifecycle) : withForeignReasoningFallback(models.streamSimple.bind(models));
-			return stream(requestModel, context, { ...options, reasoning: level === "off" ? undefined : level });
+			return stream(requestModel, context, { ...options, reasoning: level === "off" ? undefined : level, ...(cacheRetention ? { cacheRetention } : {}) });
 		},
 	};
 }
