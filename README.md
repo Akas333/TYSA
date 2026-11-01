@@ -81,7 +81,6 @@ Each Meta model does a separate job in the teaching loop. All of them go through
 | **Muse Spark Contributor** | Low-cost background agents: building the knowledge graph, grading, research | Working |
 | **Muse Wonder** | Optional upgrade for the hardest planning | Working |
 | **Muse Voice Transcribe** | Dictation: speak your answers and thinking, streamed in real time | Working |
-| **SAM 3.1** | "Tap the part that…" questions on diagrams, graded against the real outline | In progress |
 | **Muse Image** | Pictures drawn for the learner's specific confusion, checked before they're shown | In progress |
 | **Llama** (open weights, via Ollama) | The same harness running fully offline, no key needed | Working (pick a model that supports tools) |
 
