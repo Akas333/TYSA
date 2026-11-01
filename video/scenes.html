@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>TYSA video scenes</title>
+		<style>
+			@font-face {
+				font-family: "Figtree";
+				src: url("fonts/figtree-latin.woff2") format("woff2");
+				font-weight: 300 900;
+				font-style: normal;
+			}
+			@font-face {
+				font-family: "JetBrains Mono";
+				src: url("fonts/jetbrains-mono.ttf") format("truetype");
+				font-weight: 100 800;
+				font-style: normal;
+			}
+			html,
+			body {
+				margin: 0;
+				background: #111112;
+				overflow: hidden;
+			}
+			#stage {
+				position: absolute;
+				left: 0;
+				top: 0;
+				width: 1920px;
+				height: 1080px;
+				overflow: hidden;
+				background: #111112;
+				color: #f2f4f6;
+				font-family: "Figtree", ui-sans-serif, system-ui, sans-serif;
+				transform-origin: 0 0;
+				-webkit-font-smoothing: antialiased;
+			}
+			/* The app's outlined phrase (globals.css .lh-outline-text), stroke scaled to the type. */
+			.ol-lg {
+				color: transparent;
+				-webkit-text-stroke: 2.6px #f2f4f6;
+			}
+			.ol-md {
+				color: transparent;
+				-webkit-text-stroke: 2px #f2f4f6;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="stage"></div>
+		<script src="scenes.js"></script>
+		<script src="samples.js"></script>
+		<script>
+			const stage = document.getElementById("stage");
+			let render = null;
+
+			/** Mounts one scene; renderAt(t) then draws it at t seconds. */
+			window.mountScene = (id) => {
+				const scene = SCENES.find((s) => s.id === id);
+				stage.innerHTML = "";
+				const root = el("div", { position: "absolute", inset: "0", transformOrigin: "50% 50%" }, stage);
+				const draw = scene.build(root);
+				// A slow push-in on every shot, so held frames still breathe (cut-based scenes zoom per cut).
+				const push = scene.push === false ? 0 : 0.025;
+				render = (t) => {
+					root.style.transform = `scale(${(1 + push * (t / scene.dur)).toFixed(5)})`;
+					draw(t);
+				};
+				render(0);
+				return scene.dur;
+			};
+			window.renderAt = (t) => render(t);
+
+			(async () => {
+				await Promise.all([
+					document.fonts.load('600 100px "Figtree"'),
+					document.fonts.load('900 100px "Figtree"'),
+					document.fonts.load('500 26px "Figtree"'),
+					document.fonts.load('400 16px "JetBrains Mono"'),
+					document.fonts.load('600 16px "JetBrains Mono"'),
+				]);
+				await document.fonts.ready;
+				window.scenesReady = true;
+
+				// Opened directly (not by render.mjs): loop the scenes in real time.
+				const params = new URLSearchParams(location.search);
+				if (params.has("render")) return;
+				const fit = () => (stage.style.transform = `scale(${Math.min(innerWidth / W, innerHeight / H)})`);
+				fit();
+				addEventListener("resize", fit);
+				const list = params.get("scene") ? SCENES.filter((s) => s.id.startsWith(params.get("scene"))) : SCENES;
+				let i = 0;
+				let start = performance.now();
+				let dur = mountScene(list[0].id);
+				const tick = (now) => {
+					let t = (now - start) / 1000;
+					if (t >= dur) {
+						i = (i + 1) % list.length;
+						start = now;
+						t = 0;
+						dur = mountScene(list[i].id);
+					}
+					renderAt(t);
+					requestAnimationFrame(tick);
+				};
+				requestAnimationFrame(tick);
+			})();
+		</script>
+	</body>
+</html>
