@@ -94,6 +94,36 @@ function openOutside(target) {
 	if (/^https?:\/\//i.test(target)) shell.openExternal(target);
 }
 
+const SIGN_IN_PATH = "/api/subscriptions/browser";
+
+/**
+ * Subscription sign-in (apps/web subscription-client.ts) reserves a blank tab
+ * in the click, then points it at a one-use app URL that redirects to the
+ * provider. Here that tab is a hidden window: the provider redirect goes to the
+ * learner's browser and the window closes. An expired action answers with an
+ * error instead of a redirect, so that shows the window.
+ */
+function relaySignIn(child) {
+	const contents = child.webContents;
+	const close = () => !child.isDestroyed() && child.close();
+	const abandon = setTimeout(close, 60_000);
+	child.on("closed", () => clearTimeout(abandon));
+	contents.setWindowOpenHandler(() => ({ action: "deny" }));
+	const leave = (event, url) => {
+		if (isAppUrl(url) && new URL(url).pathname === SIGN_IN_PATH) return;
+		event.preventDefault();
+		openOutside(url);
+		close();
+	};
+	contents.on("will-navigate", leave);
+	contents.on("will-redirect", leave);
+	contents.on("did-finish-load", () => {
+		if (!isAppUrl(contents.getURL())) return;
+		clearTimeout(abandon);
+		child.show();
+	});
+}
+
 function createWindow() {
 	window = new BrowserWindow({
 		width: 1280,
@@ -110,9 +140,22 @@ function createWindow() {
 
 	const contents = window.webContents;
 	contents.setWindowOpenHandler(({ url }) => {
+		if (url === "about:blank") {
+			return {
+				action: "allow",
+				overrideBrowserWindowOptions: {
+					show: false,
+					width: 480,
+					height: 320,
+					title: "TYSA",
+					webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+				},
+			};
+		}
 		if (!isAppUrl(url)) openOutside(url);
 		return { action: "deny" };
 	});
+	contents.on("did-create-window", relaySignIn);
 	contents.on("will-navigate", (event, url) => {
 		if (isAppUrl(url) || url.startsWith("file:")) return;
 		event.preventDefault();

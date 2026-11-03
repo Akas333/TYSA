@@ -38,7 +38,35 @@ if (web.status !== 0) process.exit(web.status ?? 1);
 
 console.log("Bundling the server…");
 await build({
-	entryPoints: [path.join(ROOT, "apps/server/src/index.ts")],
+	// Pi loads each OAuth sign-in flow (GitHub Copilot, Grok, …) through a
+	// variable import() that a bundle can't resolve, so register its statically
+	// bundled flows, as its Bun binary does.
+	//
+	// pdfjs only takes its Node path (in-process worker, fs font data) when
+	// process.type is unset or "browser"; Electron's utility process sets it
+	// to "utility", so every PDF failed with 'No "GlobalWorkerOptions.workerSrc"
+	// specified.' Load pdfjs and its worker once with process.type hidden:
+	// both read it only while they load, and the engine's later imports get
+	// these same modules.
+	stdin: {
+		contents: [
+			'import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";',
+			'import "./apps/server/src/index.ts";',
+			"registerBunOAuthFlows();",
+			'const processType = Object.getOwnPropertyDescriptor(process, "type");',
+			'Object.defineProperty(process, "type", { value: undefined, configurable: true });',
+			"try {",
+			'	await import("pdfjs-dist/legacy/build/pdf.mjs");',
+			'	globalThis.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");',
+			"} finally {",
+			'	if (processType) Object.defineProperty(process, "type", processType);',
+			'	else delete process.type;',
+			"}",
+		].join("\n"),
+		resolveDir: ROOT,
+		sourcefile: "desktop-server.ts",
+		loader: "ts",
+	},
 	outfile: path.join(OUT, "server/index.mjs"),
 	bundle: true,
 	platform: "node",
