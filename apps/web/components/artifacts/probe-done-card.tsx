@@ -3,6 +3,7 @@ import { useContext, useState } from "react";
 import { ClipboardCheckIcon, DumbbellIcon, GraduationCapIcon } from "lucide-react";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
 import { ChatActionsContext } from "@/components/chat";
+import { MessageResponse } from "@/components/ai-elements/message";
 
 /** What Teach me anyway sends: the teacher plans from the probe on it. */
 export const TEACH_ANYWAY_TEXT = "Teach me anyway — plan the lesson from where I am.";
@@ -81,15 +82,23 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 				</p>
 			) : strands ? (
 				<div className="space-y-2">
-					{goal.length > 0 && <p className="px-1 text-sm font-medium text-foreground">{goal.join(" · ")}</p>}
+					{goal.length > 0 && <div className="px-1 text-sm font-medium text-foreground [&_p]:m-0">
+							<MessageResponse>{goal.join(" · ")}</MessageResponse>
+						</div>}
 					{strands.map((s, i) => (
 						<div key={i} className="rounded-lg bg-background/60 px-3 py-2">
-							<div className="text-sm font-medium">{s.strand}</div>
-							<div className="mt-0.5 text-sm text-muted-foreground">{s.assessment}</div>
+							<div className="text-sm font-medium [&_p]:m-0">
+								<MessageResponse>{s.strand}</MessageResponse>
+							</div>
+							<div className="mt-0.5 text-sm text-muted-foreground [&_p]:m-0">
+								<MessageResponse>{s.assessment}</MessageResponse>
+							</div>
 						</div>
 					))}
 					{assessment?.summary && (
-						<p className="px-1 text-sm text-muted-foreground">{assessment.summary}</p>
+						<div className="px-1 text-sm text-muted-foreground [&_p]:m-0">
+							<MessageResponse>{assessment.summary}</MessageResponse>
+						</div>
 					)}
 				</div>
 			) : (
@@ -102,7 +111,9 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 				>
 					<div className="mr-auto min-w-0">
 						<div className="text-sm font-semibold text-foreground">You already have this — switch to practice?</div>
-						<div className="text-xs text-muted-foreground">{switchError ?? input?.reason}</div>
+						<div className="text-xs text-muted-foreground [&_p]:m-0">
+							{switchError ?? (input?.reason && <MessageResponse>{input.reason}</MessageResponse>)}
+						</div>
 					</div>
 					<button
 						type="button"

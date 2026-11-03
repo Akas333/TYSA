@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ActivitySection } from "@/components/activity-dock";
 import { CheckIcon, ChevronDownIcon, Maximize2Icon, PanelRightCloseIcon } from "lucide-react";
-import { derivePlanStatuses, nodeProgress, type PlanNodeProgress } from "@/src/core";
+import { derivePlanStatuses, nodeProgress, type PlanNodeProgress, type PlanTree } from "@/src/core";
 import { latestTree, type PopupMessage } from "@/components/plan-block";
 import { conceptNumbers, PlanMap, planLayout } from "@/components/plan-map";
 import { ProbeGuideCard } from "@/components/probe-guide-card";
@@ -140,7 +140,14 @@ function PlanCard({
 	);
 	const recaps = useMemo(() => recapsByNode(messages), [messages]);
 	const layout = useMemo(() => (tree ? planLayout(tree) : null), [tree]);
-	if (!tree || !layout || tree.nodes.length === 0) return null;
+	const numbering = useMemo(
+		() => (tree && layout ? conceptNumbers(tree, layout, messages as Parameters<typeof conceptNumbers>[2], statuses?.current) : null),
+		[tree, layout, messages, statuses],
+	);
+	// Every concept, nothing locked (owner, 2026-11-02): upcoming concepts
+	// sit in the list muted, so the whole road is visible from the start.
+	const shown = numbering?.order ?? null;
+	if (!tree || !layout || !numbering || !shown || tree.nodes.length === 0) return null;
 
 	const byId = new Map(tree.nodes.map((n) => [n.id, n]));
 	const progressOf = (id: string): PlanNodeProgress => (statuses ? nodeProgress(statuses, id) : "upcoming");
@@ -149,7 +156,7 @@ function PlanCard({
 	// Right after a concept_done the current node waits on Continue: nothing
 	// has been taught (tagged) on it yet.
 	const waitingOnContinue = doneCount > 0 && !!statuses?.current && !startedOn(messages, statuses.current);
-	const { order, number } = conceptNumbers(tree, layout, messages as Parameters<typeof conceptNumbers>[2], statuses?.current);
+	const { number } = numbering;
 
 	return (
 		<section className="lh-panel-card" data-testid="plan-card" aria-label="Lesson plan">
@@ -183,7 +190,7 @@ function PlanCard({
 				</div>
 
 				<ol className="-mx-2 flex flex-col gap-1 pt-2">
-					{order.map((id) => {
+					{shown.map((id) => {
 						const node = byId.get(id)!;
 						const p = progressOf(id);
 						const recap = recaps.get(id);

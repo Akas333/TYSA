@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, MapIcon, MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
 import { conceptNumbers, PLAN_MAP_CHAT_WIDTH, PlanMap, planLayout } from "@/components/plan-map";
-import type { PlanBlockData, PlanNodeProgress, PlanNodeStatus, PlanTree } from "@/src/core";
+import type { PlanBlockData, PlanNodeProgress, PlanTree } from "@/src/core";
 import { derivePlanStatuses, nodeProgress } from "@/src/core";
 import { Hint } from "@/components/ui/hint";
 
@@ -16,29 +16,50 @@ import { Hint } from "@/components/ui/hint";
  * plan.ts derivePlanStatuses). Blocks are frozen snapshots rendered
  * exactly as carried (never re-derived); the popup is the live view.
  *
- * Both draw the plan map (plan-map.tsx) — the round numbered nodes the
- * side panel and the course card use; the boxed dagre diagram is retired
- * (owner, 2026-10-29: one plan drawing, kept small in the chat).
+ * The popup draws the plan map (plan-map.tsx) — the round numbered nodes
+ * the side panel and the course card use. The block in the chat is a single
+ * line (owner, 2026-11-02), not a drawing.
  */
-
-/** A snapshot status as the map's progress. */
-const BLOCK_PROGRESS: Record<PlanNodeStatus, PlanNodeProgress> = {
-	current: "current",
-	visited: "done",
-	upcoming: "upcoming",
-};
 
 /**
- * A persisted plan-block part, rendered as carried (snapshot statuses,
- * never re-derived); it opens the live plan popup.
+ * A persisted plan-block part. While the plan waits on Confirm it draws
+ * in full (it is being reviewed); after that it is one quiet line — how
+ * many concepts, and the one the lesson starts with — that opens the live
+ * plan popup. The whole map stays out of the transcript (owner, 2026-11-02: a big
+ * plan drawn all at once reads as a wall); the side panel reveals it
+ * concept by concept, and the popup is there to look ahead on purpose.
  */
-export function PlanBlock({ data, onOpen }: { data: PlanBlockData; onOpen: () => void }) {
+export function PlanBlock({ data, expanded = false, onOpen }: { data: PlanBlockData; expanded?: boolean; onOpen: () => void }) {
 	const tree = useMemo<PlanTree>(
 		() => ({ nodes: data.nodes.map((n) => ({ id: n.id, title: n.title })), edges: data.edges, version: 0 }),
 		[data],
 	);
 	const layout = useMemo(() => planLayout(tree), [tree]);
-	const progress = useMemo(() => new Map(data.nodes.map((n) => [n.id, BLOCK_PROGRESS[n.status]] as const)), [data]);
+	const first = useMemo(() => {
+		const id = data.current ?? layout.order[0];
+		return data.nodes.find((n) => n.id === id) ?? null;
+	}, [data, layout]);
+	if (expanded) {
+		// Awaiting Confirm: the learner can't agree to a plan they can't see.
+		const progress = new Map(data.nodes.map((n) => [n.id, n.id === first?.id ? "current" : "upcoming"] as const));
+		return (
+			<Hint label="Open the full plan" side="bottom">
+				<button
+					type="button"
+					data-testid="plan-block-full"
+					data-expanded
+					aria-label="Open the full plan"
+					onClick={onOpen}
+					className={cn("mx-auto my-2 block w-full text-left", PLAN_MAP_CHAT_WIDTH)}
+				>
+					<span className="mb-1 block text-center text-xs text-muted-foreground">
+						The plan · {data.nodes.length} {data.nodes.length === 1 ? "concept" : "concepts"}
+					</span>
+					<PlanMap tree={tree} layout={layout} progressOf={(id) => progress.get(id) ?? "upcoming"} viewingId={null} onSelect={() => {}} />
+				</button>
+			</Hint>
+		);
+	}
 	return (
 		<Hint label="Open the full plan" side="bottom">
 			<button
@@ -46,10 +67,19 @@ export function PlanBlock({ data, onOpen }: { data: PlanBlockData; onOpen: () =>
 				data-testid="plan-block-full"
 				aria-label="Open the full plan"
 				onClick={onOpen}
-				className={cn("mx-auto my-2 block w-full text-left", PLAN_MAP_CHAT_WIDTH)}
+				className={cn(
+					"group mx-auto my-2 flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-2.5 text-left transition-colors hover:bg-(--pill)",
+					PLAN_MAP_CHAT_WIDTH,
+				)}
 			>
-				{/* The button opens the popup; a node click just bubbles to it. */}
-				<PlanMap tree={tree} layout={layout} progressOf={(id) => progress.get(id) ?? "upcoming"} viewingId={null} onSelect={() => {}} />
+				<MapIcon className="size-4 shrink-0 text-muted-foreground" />
+				<span className="min-w-0 flex-1">
+					<span className="block text-xs text-muted-foreground">
+						Plan ready · {data.nodes.length} {data.nodes.length === 1 ? "concept" : "concepts"}
+					</span>
+					{first && <span className="block truncate text-sm text-foreground">Starting with {first.title}</span>}
+				</span>
+				<ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
 			</button>
 		</Hint>
 	);

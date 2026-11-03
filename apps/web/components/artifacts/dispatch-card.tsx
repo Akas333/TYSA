@@ -4,7 +4,7 @@ import { CheckIcon, SettingsIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
 import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
-import { BrailleSpinner } from "@/components/braille-spinner";
+import { NodeSpinner } from "@/components/node-spinner";
 
 /**
  * The dispatch card (contracts.ts "THE ASYNC PROTOCOL" §4): the tool-call
@@ -95,10 +95,10 @@ function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: st
 		>
 			<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
 				{/* The working-state grammar (owner, streaming round 2026-10-01):
-				    the Braille spinner replaces the pulsing dot — one indicator
+				    the node spinner replaces the pulsing dot — one indicator
 				    everywhere. This is the ONLY dispatch-card change; the card's
 				    shape is untouched. */}
-				<BrailleSpinner label={`${label} running`} />
+				<NodeSpinner label={`${label} running`} />
 				{label}
 				{elapsed !== null && <span className="font-normal">· {elapsed}s</span>}
 			</div>

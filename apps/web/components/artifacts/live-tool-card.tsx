@@ -1,6 +1,6 @@
 
 import { ChevronRight } from "lucide-react";
-import { BrailleSpinner } from "@/components/braille-spinner";
+import { NodeSpinner } from "@/components/node-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { toolActivityLabel } from "@/src/core";
 import type { ArtifactPartProps } from "@/src/core";
@@ -16,7 +16,7 @@ import type { ArtifactPartProps } from "@/src/core";
  * settles, the part re-renders through the artifact registry and the
  * quiet settled card replaces this one.
  *
- * The one working-state grammar everywhere (owner): Braille spinner +
+ * The one working-state grammar everywhere (owner): node spinner +
  * Shimmer(duration 1) — the thinking row, this card, the sidebar row.
  */
 interface StreamingToolPart {
@@ -46,7 +46,7 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 			className="group my-1 w-full max-w-2xl select-none"
 		>
 			<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
-				<BrailleSpinner label={`${toolActivityLabel(tool)} — live`} />
+				<NodeSpinner label={`${toolActivityLabel(tool)} — live`} />
 				<Shimmer duration={1} className="text-xs">
 					{toolActivityLabel(tool)}
 				</Shimmer>

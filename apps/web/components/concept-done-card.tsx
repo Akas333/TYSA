@@ -103,7 +103,11 @@ export function ConceptDoneCard({
 						<div className="min-w-0">
 							<div className="text-xs text-muted-foreground">Up next</div>
 							<div className="font-medium text-foreground">{nextTitle}</div>
-							{input.nextHint && <p className="mt-0.5 text-sm text-muted-foreground">{input.nextHint}</p>}
+							{input.nextHint && (
+								<div className="mt-0.5 text-sm text-muted-foreground [&_p]:m-0">
+									<MessageResponse>{input.nextHint}</MessageResponse>
+								</div>
+							)}
 						</div>
 						{live ? (
 							<Button data-testid="concept-continue" className="shrink-0" onClick={() => onContinue(nextTitle)}>
@@ -119,7 +123,11 @@ export function ConceptDoneCard({
 						<div className="min-w-0">
 							<div className="text-xs text-muted-foreground">Next in the course</div>
 							<div className="font-medium text-foreground">{courseNext.title}</div>
-							{input.nextHint && <p className="mt-0.5 text-sm text-muted-foreground">{input.nextHint}</p>}
+							{input.nextHint && (
+								<div className="mt-0.5 text-sm text-muted-foreground [&_p]:m-0">
+									<MessageResponse>{input.nextHint}</MessageResponse>
+								</div>
+							)}
 						</div>
 						<Button data-testid="course-next" className="shrink-0" onClick={courseNext.onOpen}>
 							Next concept

@@ -20,7 +20,7 @@ const NAV_ROW =
 	"flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground transition-colors hover:bg-(--pill) focus-visible:outline-2 focus-visible:outline-primary";
 const NAV_ROW_ACTIVE = "bg-(--pill) hover:bg-(--pill)";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
-import { BrailleSpinner } from "@/components/braille-spinner";
+import { NodeSpinner } from "@/components/node-spinner";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { SettingsDialogProvider, useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { Hint } from "@/components/ui/hint";
@@ -186,9 +186,9 @@ export function SidebarToggle() {
 }
 
 /**
- * The row's status indicator (owner, minimal-color round): the braille
- * spinner, ONLY while a teach turn is in flight — monochrome motion, the
- * terminal's own glyph, existing exactly as long as the work does and
+ * The row's status indicator (owner, minimal-color round): the node
+ * spinner, ONLY while a teach turn is in flight — quiet motion, the
+ * plan map's own mark, existing exactly as long as the work does and
  * vanishing the moment it ends. Every other state renders NOTHING:
  * phases only advance (all sessions end in Teaching — phase-as-signal was
  * decoration, now retired app-wide), and question-pending is the dominant
@@ -198,7 +198,7 @@ export function SidebarToggle() {
  */
 function SessionStatus({ busy }: { busy: boolean }) {
 	if (!busy) return null;
-	return <BrailleSpinner />;
+	return <NodeSpinner />;
 }
 
 /** Compact "how long ago": "just now", "5m ago", "3h ago", "2d ago",
@@ -351,10 +351,53 @@ const KIND_FILTER_KEY = "lh:session-kind-filter";
 const COLLAPSED_FOLDERS_KEY = "lh:collapsed-folders";
 /** The drop target that makes a new folder around the dragged chat. */
 const NEW_FOLDER_DROP = "__new_folder__";
+/** Desktop sidebar width (px), dragged from its right edge; per browser. */
+const WIDTH_KEY = "lh:sidebar-width";
+const DEFAULT_WIDTH = 288; // w-72
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 480;
 const MENU_ITEM = "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-foreground transition-colors hover:bg-accent";
 
 function SessionsSidebar() {
 	const { open, toggle, mobile, close } = useSidebar();
+	const [width, setWidth] = useState(DEFAULT_WIDTH);
+	const [resizing, setResizing] = useState(false);
+	useEffect(() => {
+		const stored = Number(window.localStorage.getItem(WIDTH_KEY));
+		if (stored >= MIN_WIDTH && stored <= MAX_WIDTH) setWidth(stored);
+	}, []);
+	const saveWidth = useCallback((w: number) => {
+		setWidth(w);
+		window.localStorage.setItem(WIDTH_KEY, String(w));
+	}, []);
+	// Drag the right edge: width follows the pointer, clamped. The open/close
+	// transition is suspended meanwhile so the column tracks without lag.
+	const startResize = useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			e.preventDefault();
+			const startX = e.clientX;
+			const startW = width;
+			let next = startW;
+			setResizing(true);
+			const onMove = (ev: PointerEvent) => {
+				next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW + ev.clientX - startX));
+				setWidth(next);
+			};
+			const onUp = () => {
+				window.removeEventListener("pointermove", onMove);
+				window.removeEventListener("pointerup", onUp);
+				document.body.style.removeProperty("cursor");
+				document.body.style.removeProperty("user-select");
+				setResizing(false);
+				saveWidth(next);
+			};
+			document.body.style.cursor = "col-resize";
+			document.body.style.userSelect = "none";
+			window.addEventListener("pointermove", onMove);
+			window.addEventListener("pointerup", onUp);
+		},
+		[width, saveWidth],
+	);
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [folders, setFolders] = useState<ChatFolder[]>([]);
 	const [query, setQuery] = useState("");
@@ -933,8 +976,9 @@ function SessionsSidebar() {
 							"fixed inset-y-0 left-0 z-50 w-[min(18rem,calc(100vw-3rem))] shadow-2xl",
 							open ? "translate-x-0" : "-translate-x-full",
 						)
-					: cn("shrink-0", open ? "w-72" : "w-0"),
+					: "relative shrink-0",
 			)}
+			style={mobile ? undefined : { width: open ? width : 0, ...(resizing ? { transition: "none" } : {}) }}
 			aria-hidden={!open}
 			// Picking a destination on a phone closes the drawer, even when
 			// it's the page already showing (no route change to catch).
@@ -948,8 +992,9 @@ function SessionsSidebar() {
 			<div
 				className={cn(
 					"flex h-full flex-col border-r bg-background",
-					mobile ? "w-full pt-(--safe-top) pb-(--safe-bottom) pl-(--safe-left)" : "w-72",
+					mobile && "w-full pt-(--safe-top) pb-(--safe-bottom) pl-(--safe-left)",
 				)}
+				style={mobile ? undefined : { width }}
 			>
 				{/* Top icon row: close, back, forward. */}
 				<div className="flex h-15 shrink-0 items-center gap-0.5 px-3">
@@ -1426,6 +1471,20 @@ function SessionsSidebar() {
 					onClose={() => setDeleting(null)}
 					onDeleted={onDeleted}
 				/>
+				{!mobile && open && (
+					<div
+						role="separator"
+						aria-orientation="vertical"
+						aria-label="Resize sidebar"
+						title="Drag to resize · double-click to reset"
+						onPointerDown={startResize}
+						onDoubleClick={() => saveWidth(DEFAULT_WIDTH)}
+						className={cn(
+							"absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize transition-colors hover:bg-primary/30",
+							resizing && "bg-primary/40",
+						)}
+					/>
+				)}
 			</aside>
 		</>
 	);

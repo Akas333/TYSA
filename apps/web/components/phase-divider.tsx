@@ -6,7 +6,7 @@ import type { Phase3, TextbookStage } from "@/src/core";
  * dotted boundary rule the transcript draws where the session moves into a
  * new phase. Phase COLOR is retired app-wide (phases only advance, so
  * color-as-signal was decoration); the label text carries the phase, and
- * the chip's old dot slot is repurposed for the braille spinner while a
+ * the chip's old dot slot is repurposed for the node spinner while a
  * turn is in flight — motion is the honest state signal. Replaces the old
  * inline plan-divider (artifact registry): the boundary is a MESSAGE-level
  * seam, so chat.tsx renders it at the message where the phase changes, not
@@ -19,7 +19,7 @@ import type { Phase3, TextbookStage } from "@/src/core";
  *
  * Owner, minimal-color round 2: the chip is LABEL-ONLY, deliberately — a
  * working-state spinner was tried here and rejected: the pill's curve and
- * the square braille cell fought for space, and the chat surface already
+ * the square spinner cell fought for space, and the chat surface already
  * shows in-flight work (thinking shimmer, the dock). The chip states the
  * phase; work-state is the sidebar row's spinner.
  */

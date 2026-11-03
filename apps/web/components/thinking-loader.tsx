@@ -43,30 +43,41 @@ export function ThinkingLoader({ label, className, testId }: { label: string; cl
 			data-testid={testId ?? "thinking-loader"}
 			className={cn("lh-card-enter flex items-center gap-2.5 text-[13px] text-muted-foreground", className)}
 		>
-			<svg viewBox="0 0 30 12" className="h-4 w-auto shrink-0 overflow-visible" aria-hidden>
-				<line x1={NODES[0]} y1={6} x2={NODES[2]} y2={6} strokeWidth={1} strokeLinecap="round" className="stroke-border" />
-				<line
-					x1={NODES[0]}
-					y1={6}
-					x2={NODES[2]}
-					y2={6}
-					pathLength={1}
-					strokeWidth={1.4}
-					strokeLinecap="round"
-					className="lh-weave-link stroke-primary"
-				/>
-				{NODES.map((cx) => (
-					<circle key={`base-${cx}`} cx={cx} cy={6} r={2.6} strokeWidth={1} className="fill-card stroke-border" />
-				))}
-				<circle cx={NODES[2]} cy={6} r={2.6} className="lh-weave-halo fill-primary" />
-				{NODES.map((cx, i) => (
-					<circle key={`lit-${cx}`} cx={cx} cy={6} r={2.6} data-i={i} className="lh-weave-node fill-primary" />
-				))}
-			</svg>
+			<LoaderMark className="h-4" />
 			<Shimmer as="span" duration={1.8}>
 				{label}
 			</Shimmer>
 			{elapsed >= SHOW_ELAPSED_AFTER_S && <span className="tabular-nums text-muted-foreground/60">{elapsed}s</span>}
 		</span>
+	);
+}
+
+/**
+ * The loader's mark on its own: three nodes on one link, drawn node to
+ * node. The turn line uses it beside its label; NodeSpinner is the compact
+ * working state (sidebar rows, tool cards). Height sets the size.
+ */
+export function LoaderMark({ className }: { className?: string }) {
+	return (
+		<svg viewBox="0 0 30 12" className={cn("w-auto shrink-0 overflow-visible", className)} aria-hidden>
+			<line x1={NODES[0]} y1={6} x2={NODES[2]} y2={6} strokeWidth={1} strokeLinecap="round" className="stroke-border" />
+			<line
+				x1={NODES[0]}
+				y1={6}
+				x2={NODES[2]}
+				y2={6}
+				pathLength={1}
+				strokeWidth={1.4}
+				strokeLinecap="round"
+				className="lh-weave-link stroke-primary"
+			/>
+			{NODES.map((cx) => (
+				<circle key={`base-${cx}`} cx={cx} cy={6} r={2.6} strokeWidth={1} className="fill-card stroke-border" />
+			))}
+			<circle cx={NODES[2]} cy={6} r={2.6} className="lh-weave-halo fill-primary" />
+			{NODES.map((cx, i) => (
+				<circle key={`lit-${cx}`} cx={cx} cy={6} r={2.6} data-i={i} className="lh-weave-node fill-primary" />
+			))}
+		</svg>
 	);
 }

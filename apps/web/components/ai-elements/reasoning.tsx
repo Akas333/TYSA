@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
-import { BrailleSpinner } from "@/components/braille-spinner";
+import { NodeSpinner } from "@/components/node-spinner";
 import type { ComponentProps, ReactNode } from "react";
 import {
   createContext,
@@ -168,13 +168,13 @@ export const ReasoningTrigger = memo(
         {children ?? (
           <>
             {/* The working-state grammar (owner, streaming round
-                2026-10-01): the Braille spinner replaces the brain icon
+                2026-10-01): the node spinner replaces the brain icon
                 WHILE STREAMING ONLY — motion is the signal, so a finished
                 row carries no icon at all, just text + chevron. Size:
                 the component default (h-3) — IDENTICAL to the placeholder
                 spinner (owner, 2026-10-02): the handoff between the two
                 states must be visually seamless, one size everywhere. */}
-            {isStreaming && <BrailleSpinner label="Thinking" />}
+            {isStreaming && <NodeSpinner label="Thinking" />}
             {getThinkingMessage(isStreaming)}
             <ChevronDownIcon
               className={cn(
