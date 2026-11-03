@@ -99,6 +99,11 @@ function defaultThinkingLevel(model: Model<Api>): ThinkingLevel {
 	return supported[0] ?? "off";
 }
 
+/** Retries for a transient provider error (overloaded, rate-limited,
+ *  5xx) before the turn fails: about 8s of backoff in all, unless the
+ *  provider asks for longer with retry-after. */
+export const PROVIDER_MAX_RETRIES = 4;
+
 /** The production engine for a RESOLVED spec (model slots wave,
  *  2026-09-20): provider-aware catalog lookup + thinking clamp. The API
  *  key is resolved by pi-ai itself from the environment per request (the
@@ -134,8 +139,18 @@ export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (
 			const purpose = typeof background === "function" ? background : () => background;
 			// API-key streams resend once without reasoning another key or
 			// account was issued (foreign-reasoning.ts).
+			const subscription = spec.provider === "chatgpt" || !!nativeId;
 			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : nativeId ? nativeSubscriptionStream(models.getProvider(nativeId)!, purpose, lifecycle) : withForeignReasoningFallback(models.streamSimple.bind(models));
-			return stream(requestModel, context, { ...options, reasoning: level === "off" ? undefined : level, ...(cacheRetention ? { cacheRetention } : {}) });
+			return stream(requestModel, context, {
+				...options,
+				reasoning: level === "off" ? undefined : level,
+				...(cacheRetention ? { cacheRetention } : {}),
+				// API-key streams ride out a busy provider (owner, 2026-11-02:
+				// a single Meta 503 "service_overloaded" killed the turn):
+				// pi-ai retries 408/409/429/5xx with backoff, honoring
+				// retry-after. Subscription streams own their retry policy.
+				...(subscription ? {} : { maxRetries: options?.maxRetries ?? PROVIDER_MAX_RETRIES }),
+			});
 		},
 	};
 }
