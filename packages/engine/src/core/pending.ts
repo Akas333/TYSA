@@ -48,12 +48,16 @@ export const QUESTION_TOOLS = [
 	"ask_user_question",
 	"explain",
 	"recall",
+	// The coding exercise (2026-11-02): answered in the editor dock, not
+	// the question dock — same pending/answer/stop machinery.
+	"code_exercise",
 ] as const;
 
 /** The tool→kind map (the dock's own fold, named once — the dismissal
  *  path and the dock must never disagree on what a tool is). The probe
  *  names fold onto their teach kinds — the dock is kind-driven. */
-export function toolQuestionKind(tool: string): "quiz" | "ask" | "explain" {
+export function toolQuestionKind(tool: string): "quiz" | "ask" | "explain" | "code" {
+	if (tool === "code_exercise") return "code";
 	return tool === "quiz" || tool === "probe" ? "quiz" : tool === "explain" || tool === "recall" ? "explain" : "ask";
 }
 
@@ -146,6 +150,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
 	demo: "Building a demo…",
 	visual: "Making a visual…",
 	pdf: "Reading a PDF…",
+	run_code: "Running code…",
+	toolchains: "Checking installed languages…",
 	plan_init: "Drawing up the plan…",
 	probe_done: "Concluding the assessment…",
 };
@@ -156,6 +162,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
  *  bottom line. Question tools are excluded here: their input-streaming
  *  part renders in the dock, never a live card. */
 export function toolActivityLabel(tool: string): string {
+	if (tool === "code_exercise") return "Writing an exercise…";
 	if ((QUESTION_TOOLS as readonly string[]).includes(tool)) return "Writing a question…";
 	return ACTIVITY_LABELS[tool] ?? "Working…";
 }

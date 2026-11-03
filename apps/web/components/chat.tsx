@@ -1,5 +1,5 @@
 
-import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -44,6 +44,7 @@ import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { PlanSidebar } from "@/components/plan-sidebar";
 import { conceptNumbers, planLayout } from "@/components/plan-map";
 import { ConceptOpener, conceptAnchorId, conceptOpenings, openingKey } from "@/components/concept-markers";
+import { ConceptRail, type RailConcept } from "@/components/concept-rail";
 import { ConceptDoneCard, continueMessage, type ConceptDoneInputView, type ConceptDoneOutputView } from "@/components/concept-done-card";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
@@ -53,6 +54,9 @@ import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
+import type { CodeExerciseView } from "@/components/code-dock";
+import { CodeAnsweredCard } from "@/components/code-answered-card";
+import { TryItEnabled } from "@/components/md-blocks";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
@@ -90,6 +94,9 @@ import { TextbookContinueBar } from "@/components/artifacts/textbook-cards";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { derivePlanStatuses, slotsConfigured, type ModelsSettings } from "@/src/core";
 import { useSettingsSaved } from "@/components/settings-signal";
+
+/** The coding-exercise dock — CodeMirror loads when an exercise is posed. */
+const CodeDock = lazy(() => import("@/components/code-dock").then((m) => ({ default: m.CodeDock })));
 
 /** One width for everything: transcript, cards, and the bottom blob share this column. */
 /**
@@ -450,7 +457,8 @@ export function Chat({
 			// route parks the dismissal (202) and the settle applies it.
 			const p = pendingRef.current;
 			if (p) {
-				const question = (p.input as { question?: string } | null)?.question ?? "";
+				const pin = p.input as { question?: string; title?: string } | null;
+				const question = pin?.question ?? pin?.title ?? "";
 				const reading = readingThinkingRef.current.trim() || undefined;
 				clearReadingThinking();
 				const answer = dismissedAnswer(toolQuestionKind(p.tool), question);
@@ -1001,7 +1009,20 @@ export function Chat({
 			if (frame) cancelAnimationFrame(frame);
 		};
 	}, [openings]);
+	// The rail's ticks: each concept the transcript has opened, in order.
+	const railConcepts = useMemo<RailConcept[]>(() => {
+		if (!planTree || !planNumbers) return [];
+		const out: RailConcept[] = [];
+		for (const { nodeId } of openings.values()) {
+			const node = planTree.nodes.find((n) => n.id === nodeId);
+			if (node && !out.some((c) => c.id === nodeId)) out.push({ id: nodeId, title: node.title, number: planNumbers.get(nodeId) ?? 0 });
+		}
+		return out;
+	}, [openings, planTree, planNumbers]);
 	const jumpToConcept = useCallback((nodeId: string) => {
+		// Release the bottom-follow lock first, or it pins the transcript back
+		// down before the smooth scroll gets anywhere.
+		scrollContextRef.current?.stopScroll();
 		document.getElementById(conceptAnchorId(nodeId))?.scrollIntoView({ behavior: "smooth", block: "start" });
 	}, []);
 	const openerAt = (key: string) => {
@@ -1719,6 +1740,9 @@ export function Chat({
 															<PlanBlock
 																key={pi}
 																data={part.data as PlanBlockData}
+																// Drawn in full while it waits on Confirm — the
+																// learner reviews it before agreeing; a line after.
+																expanded={planAwaitingConfirm && mi === messages.length - 1}
 																onOpen={() => setPlanOpen(true)}
 															/>
 														);
@@ -1741,6 +1765,14 @@ export function Chat({
 																} } : null}
 															/>
 														);
+													}
+													case "tool-code_exercise": {
+														// Pending exercises live in the code dock; submitted ones
+														// render as the collapsed submission record.
+														if (part.state === "output-available") {
+															return <CodeAnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} />;
+														}
+														return null;
 													}
 													case "tool-quiz":
 													case "tool-probe":
@@ -1963,6 +1995,7 @@ export function Chat({
 						onClose={() => setFigureFocus(null)}
 					/>
 				)}
+				<ConceptRail concepts={railConcepts} viewingId={viewingConcept} onJump={jumpToConcept} />
 				{planOpen && <PlanPopup messages={messages} onClose={() => setPlanOpen(false)} />}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
@@ -2622,7 +2655,24 @@ function DockOverlay({
 						key={mode}
 						className={`flex min-h-0 flex-col ${mode === initialModeRef.current ? "" : "dock-variant"}`}
 					>
-							{pending ? (
+							{/* No Try it inside a pending question or problem: running the
+							    code would answer "what does this print?" for the learner. */}
+							<TryItEnabled.Provider value={false}>
+							{pending?.tool === "code_exercise" ? (
+								<Suspense fallback={null}>
+								<CodeDock
+									toolCallId={pending.toolCallId}
+									input={pending.input as CodeExerciseView}
+									expanded={expanded}
+									onExpand={() => {
+										setExpanded(true);
+										void suppressFoldDuringReveal();
+									}}
+									onSubmit={onSubmitAnswer}
+									compactionRunning={compactionRunning}
+								/>
+								</Suspense>
+							) : pending ? (
 								<QuestionDock
 									toolName={pending.tool as "quiz" | "probe" | "ask_user_question" | "explain" | "recall"}
 									toolCallId={pending.toolCallId}
@@ -2655,6 +2705,7 @@ function DockOverlay({
 							) : (
 								composer
 							)}
+							</TryItEnabled.Provider>
 						</div>
 					</div>
 					{revealPending && readingField}

@@ -26,8 +26,8 @@
  * EXPAND icon (opens the session overlay) when a chat page is mounted.
  */
 
-import { cloneElement, isValidElement, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { CheckIcon, CopyIcon, MaximizeIcon } from "lucide-react";
+import { cloneElement, createContext, isValidElement, lazy, Suspense, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { CheckIcon, CopyIcon, MaximizeIcon, PlayIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
 	CodeBlock,
@@ -41,6 +41,14 @@ import { MermaidError } from "@/components/mermaid-error";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { chartSize, useSessionMermaid } from "@/components/session-overlay";
 import { Hint } from "@/components/ui/hint";
+import { runnableLanguage } from "@/components/code-run";
+
+/** Whether code blocks here offer Try it. The docks turn it off: running the
+ *  code in a "what does this print?" question would hand over the answer. */
+export const TryItEnabled = createContext(true);
+
+/** The Try-it scratch editor — CodeMirror loads on first press, not with the lesson. */
+const CodeScratch = lazy(() => import("@/components/code-scratch"));
 
 // ─── The one affordance: the hover-reveal corner copy ────────────────────────
 
@@ -233,6 +241,8 @@ function MermaidInline({ chart }: { chart: string }) {
  *  (data-streamdown="code-block"…). */
 export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	const incomplete = useIsCodeFenceIncomplete();
+	const [trying, setTrying] = useState(false);
+	const tryItEnabled = useContext(TryItEnabled);
 	const { children, className, node, ...rest } = props;
 
 	// Inline code: no data-block (the pre handler stamps block fences only).
@@ -253,8 +263,25 @@ export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	const startMatch = /startLine=(\d+)/.exec(meta);
 	const startLine = startMatch ? Number.parseInt(startMatch[1]!, 10) : undefined;
 	const lineNumbers = !/\bnoLineNumbers\b/.test(meta);
+	// Try it (learn-to-program, 2026-11-02): a runnable fence opens a scratch
+	// editor beneath itself, once the fence has finished streaming.
+	const runnable = incomplete || !tryItEnabled ? null : runnableLanguage(language);
 	return (
 		<div className="group/md relative" data-testid="md-code">
+			{runnable && (
+				<button
+					type="button"
+					data-testid="md-try-it"
+					onClick={(e) => {
+						blurAfterPointerClick(e);
+						setTrying((t) => !t);
+					}}
+					className="absolute top-1.5 right-9 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+				>
+					<PlayIcon className="size-3" />
+					Try it
+				</button>
+			)}
 			<CopyCorner className="absolute top-1.5 right-2 z-10" getText={() => source} label="Copy code" />
 			<CodeBlock
 				code={source}
@@ -264,6 +291,11 @@ export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 				startLine={startLine !== undefined && startLine >= 1 ? startLine : undefined}
 				lineNumbers={lineNumbers}
 			/>
+			{runnable && trying && (
+				<Suspense fallback={null}>
+					<CodeScratch language={runnable} source={source} onClose={() => setTrying(false)} />
+				</Suspense>
+			)}
 		</div>
 	);
 }

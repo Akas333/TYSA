@@ -28,6 +28,7 @@ import { lsTool } from "./tools/ls.ts";
 import { findTool } from "./tools/find.ts";
 import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
+import { codeTools } from "./tools/code.ts";
 import { questionBankTools } from "./tools/question-bank.ts";
 import type { BankQuestion } from "../core/question-bank.ts";
 import type { GraphStore } from "../core/ports.ts";
@@ -487,6 +488,9 @@ export function createTeacherTools(
 			...(ctx.readableMaterials ? materialTools({ chatId: ctx.chatId, readable: ctx.readableMaterials }) : {}),
 			...(ctx.questionBank ? questionBankTools({ questions: ctx.questionBank }) : {}),
 			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn, searchAvailable: ctx.searchAvailable }),
+			// Learn-to-program (2026-11-02): run code with the learner's own
+			// toolchains and pose editor exercises (prompts/teacher/60-coding.md).
+			...codeTools(),
 		},
 		withoutMechanics(enabled),
 		),

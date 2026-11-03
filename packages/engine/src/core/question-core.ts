@@ -413,7 +413,7 @@ export interface OptionAnswer {
 	index: number; // 1-based display index
 }
 
-export type QuestionKind = "quiz" | "ask" | "explain";
+export type QuestionKind = "quiz" | "ask" | "explain" | "code";
 export type SelectMode = "single-select" | "multi-select";
 export type QuestionMode = SelectMode | "text";
 
@@ -477,7 +477,23 @@ export interface QuestionAnswerData {
 	committed?: string; // explain only (rendering): the model's committed answer
 	explanation?: string; // quiz only (rendering)
 	dismissed?: boolean;
+	/** code only: the learner's submitted program and how it did. */
+	code?: CodeSubmission;
 	answeredAt: string;
+}
+
+/** A coding-exercise submission (code_exercise, 2026-11-02). */
+export interface CodeSubmission {
+	language: string;
+	source: string;
+	/** Per-test outcome at submit time; absent when the run never got that far. */
+	tests?: { name: string; hidden: boolean; passed: boolean; expected?: string; actual?: string }[];
+	/** The compiler's complaint when the code did not build. */
+	compileError?: string;
+	/** "not-installed" etc. — the run could not happen at all. */
+	runError?: string;
+	/** The learner asked for help instead of claiming it works. */
+	stuck?: boolean;
 }
 
 /** Client-facing question payload — deliberately omits the answer. */
@@ -809,5 +825,26 @@ export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, un
 	const thinking = ad.thinking ?? ad.note;
 	if (thinking) out.thinking = thinking;
 	if (ad.readingThinking) out.thinkingWhileReading = ad.readingThinking;
+	if (ad.code) {
+		const c = ad.code;
+		const tests = c.tests ?? [];
+		out.submission = {
+			language: c.language,
+			source: c.source,
+			...(c.stuck ? { stuck: true } : {}),
+			...(c.compileError ? { compileError: c.compileError.slice(0, 3000) } : {}),
+			...(c.runError ? { runError: c.runError } : {}),
+			...(tests.length > 0
+				? {
+						passed: `${tests.filter((t) => t.passed).length}/${tests.length}`,
+						tests: tests.map((t) =>
+							t.passed || t.hidden
+								? { name: t.name, passed: t.passed, ...(t.hidden ? { hidden: true } : {}) }
+								: { name: t.name, passed: false, expected: t.expected, actual: (t.actual ?? "").slice(0, 600) },
+						),
+					}
+				: {}),
+		};
+	}
 	return out;
 }

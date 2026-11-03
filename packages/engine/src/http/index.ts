@@ -7,6 +7,8 @@ import * as activityAbort from "./routes/activity-abort.ts";
 import * as activity from "./routes/activity.ts";
 import * as answers from "./routes/answers.ts";
 import * as chat from "./routes/chat.ts";
+import * as codeRun from "./routes/code-run.ts";
+import * as codeToolchains from "./routes/code-toolchains.ts";
 import * as chatsIdArtifactUi from "./routes/chats-id-artifact-ui.ts";
 import * as chatsIdDismiss from "./routes/chats-id-dismiss.ts";
 import * as chatsIdMarkdown from "./routes/chats-id-markdown.ts";
@@ -65,6 +67,8 @@ export const API_ROUTES: readonly ApiRoute[] = [
 	{ path: "/api/activity", handlers: { GET: activity.GET as RouteHandler } },
 	{ path: "/api/answers", handlers: { GET: answers.GET as RouteHandler } },
 	{ path: "/api/chat", handlers: { POST: chat.POST as RouteHandler } },
+	{ path: "/api/code/run", handlers: { POST: codeRun.POST as RouteHandler } },
+	{ path: "/api/code/toolchains", handlers: { GET: codeToolchains.GET as RouteHandler } },
 	{ path: "/api/data", handlers: { GET: data.GET as RouteHandler } },
 	{ path: "/api/data/export", handlers: { POST: dataExport.POST as RouteHandler } },
 	{ path: "/api/data/import", handlers: { POST: dataImport.POST as RouteHandler } },

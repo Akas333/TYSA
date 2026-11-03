@@ -46,7 +46,7 @@ const PRACTICE_SHARED_FRAGMENTS = ["10-voice.md", "15-accuracy.md", "16-mental-m
  *  (2026-10-29): the method, the planning and plan-map mechanics, the
  *  course plan, the check principles, jobs and demos. The guided step loop (20-teaching,
  *  25-concept-close, 28-predictions) is replaced by prompts/textbook/. */
-const TEXTBOOK_TEACHER_FRAGMENTS = ["05-method.md", "10-planning.md", "12-course.md", "30-question-principles.md", "40-jobs.md", "50-demos.md"];
+const TEXTBOOK_TEACHER_FRAGMENTS = ["05-method.md", "10-planning.md", "12-course.md", "30-question-principles.md", "40-jobs.md", "50-demos.md", "60-coding.md"];
 
 /** Absolute path for an override file (unchecked — validate first). */
 function overrideFileFor(segmentPath: string): string {
