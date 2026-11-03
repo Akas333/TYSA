@@ -22,7 +22,7 @@ const only = process.argv.slice(2);
 if (!CHROME || !FFMPEG) throw new Error("Set CHROME and FFMPEG to the browser and ffmpeg binaries.");
 
 // Fonts don't load from file:// pages, so serve this folder over localhost.
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".woff2": "font/woff2", ".ttf": "font/ttf" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".woff2": "font/woff2", ".ttf": "font/ttf", ".png": "image/png" };
 const server = http.createServer((req, res) => {
 	const file = path.join(here, decodeURIComponent(new URL(req.url, "http://x").pathname));
 	if (!file.startsWith(here) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {

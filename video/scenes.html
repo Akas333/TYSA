@@ -50,6 +50,9 @@
 		<div id="stage"></div>
 		<script src="scenes.js"></script>
 		<script src="samples.js"></script>
+		<script src="hook.js"></script>
+		<script src="explainer.js"></script>
+		<script src="film.js"></script>
 		<script>
 			const stage = document.getElementById("stage");
 			let render = null;
@@ -80,6 +83,7 @@
 					document.fonts.load('600 16px "JetBrains Mono"'),
 				]);
 				await document.fonts.ready;
+				await Promise.all(window.PRELOAD ?? []);
 				window.scenesReady = true;
 
 				// Opened directly (not by render.mjs): loop the scenes in real time.

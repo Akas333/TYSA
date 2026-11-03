@@ -166,7 +166,7 @@ let uid = 0;
 
 /**
  * The brain mascot. Local origin is its centre; feet sit about 238 below at s = 1.
- * o: x, y, s, sy, rot, tone (0 pink → 1 grey), eyes ("normal" | "wide" | "happy"), lid, look,
+ * o: x, y, s, sy, rot, tone (0 pink → 1 grey), eyes ("normal" | "wide" | "happy"), lid, look ([x, y] or one per eye),
  * brows, mouth, glasses, arms / armsFront / legs ([x1,y1,cx,cy,x2,y2] each), buff, extra.
  */
 function brain(o) {
@@ -200,8 +200,9 @@ function brain(o) {
 			const ry = eyes === "wide" ? 40 : 35;
 			const pr = eyes === "wide" ? 11 : 14;
 			const cid = `${id}${ex < 0 ? "l" : "r"}`;
-			const px = ex + look[0] * 11;
-			const py = 12 + look[1] * 12;
+			const lk = Array.isArray(look[0]) ? look[ex < 0 ? 0 : 1] : look;
+			const px = ex + lk[0] * 11;
+			const py = 12 + lk[1] * 12;
 			m += `<clipPath id="${cid}"><ellipse cx="${ex}" cy="12" rx="${rx}" ry="${ry}"/></clipPath>`;
 			m += `<ellipse cx="${ex}" cy="12" rx="${rx}" ry="${ry}" fill="#fff"/>`;
 			m += `<circle cx="${f1(px)}" cy="${f1(py)}" r="${pr}" fill="#17171c"/><circle cx="${f1(px - 4)}" cy="${f1(py - 5)}" r="5" fill="#fff"/>`;

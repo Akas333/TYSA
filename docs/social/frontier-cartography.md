@@ -10,3 +10,9 @@ Built from the app's own design system (`apps/web/app/globals.css`) so posts loo
 - **Chrome:** the real composer ("What do you want to learn?", return and mic icons) and the Guided / Textbook / Practice tabs anchor the bottom.
 
 Renderer: Pillow, 2x supersampled, 1080×1350 output.
+
+## X version
+
+`tysa-x.png`: the same design at 16:9 (1600×900, rendered at 2× to 3200×1800). The headline runs on two lines, with the outlined phrase on its own. The sphere is drawn with the home screen's own maths (`sphere-backdrop.tsx`: 44 latitude rings, the same tilt and perspective), and it fades out above the composer so the bottom chrome stays clean. The Meta mark is the Simple Icons path from `provider-logo.tsx`.
+
+Renderer: HTML in headless Chrome (puppeteer-core), with fonts from `video/fonts`.
