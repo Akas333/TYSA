@@ -22,7 +22,7 @@ import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
 import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
-import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
+import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL, sendToUserText } from "../core/native-messages.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
 import { usageWasAdmitted } from "./subscription-request-cycle.ts";
 
@@ -203,6 +203,58 @@ export function makeQuestionStopper(kind: AgentKind) {
 	};
 }
 
+/** The least teaching prose a check needs above it (owner, 2026-11-02:
+ *  a missed prediction rolled straight into the check with nothing
+ *  taught in between). A sentence or two of acknowledgement is not a
+ *  lesson. */
+export const MIN_TEACHING_BEFORE_CHECK = 280;
+
+/** Exported for tests: the model families whose plain text does not
+ *  reliably reach the learner mid-turn, so they get the explicit
+ *  `send_to_user` channel. Claude, and Meta's Muse models (owner,
+ *  2026-11-02: a Muse lesson wrote no text at all beside its tool calls —
+ *  every question arrived with no teaching above it). */
+export function needsSendToUser(model: { id: string; provider?: string }): boolean {
+	const id = model.id.toLowerCase();
+	return id.includes("claude") || id.includes("muse-") || model.provider === "meta";
+}
+
+/** Learner-facing prose of one message: plain text plus the
+ *  `send_to_user` channel. */
+function assistantText(message: AgentMessage): string {
+	if (message.role !== "assistant") return "";
+	return message.content.map((c) => (c.type === "text" ? c.text : sendToUserText(c) ?? "")).join("");
+}
+
+/** Exported for tests: the teacher's guard against an untaught check. A
+ *  `type: "check"` question is blocked unless the assistant wrote real
+ *  teaching since the learner last spoke (his last answer or message) —
+ *  the block comes back as an error result, so the model teaches and
+ *  re-poses in the same run. */
+export function untaughtCheckReason(
+	toolName: string,
+	args: unknown,
+	messages: readonly AgentMessage[],
+	current: AgentMessage,
+): string | undefined {
+	if (!(QUESTION_TOOLS as readonly string[]).includes(toolName)) return undefined;
+	if ((args as { type?: unknown } | null)?.type !== "check") return undefined;
+	let prose = assistantText(current);
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m === current) continue;
+		if (m.role === "user") break;
+		if (m.role === "toolResult" && (QUESTION_TOOLS as readonly string[]).includes(m.toolName)) break;
+		prose += assistantText(m);
+	}
+	if (prose.trim().length >= MIN_TEACHING_BEFORE_CHECK) return undefined;
+	return (
+		"Check blocked: nothing has been taught since the learner's last answer. A check comes AFTER the step's teaching. " +
+		"Write the teaching first, as learner-facing prose (through `send_to_user` when you have it). If his prediction missed or he didn't know, resolve it: what is actually true and why. " +
+		"Then pose the check again."
+	);
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	// Practice never reaches the role fallback (the handler ALWAYS injects
 	// the session's conversation engine — practice rides the same
@@ -227,11 +279,11 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			thinkingLevel: engine.level,
 			// Conditional registry inclusion, like the graph-tool gates: when
 			// closed, neither the tool nor its usage instructions reach the model.
-			// Match Claude across providers (including OpenRouter), not the API
-			// transport. Explicit test registries remain caller-owned.
+			// Match by model family across providers (including OpenRouter),
+			// not the API transport. Explicit test registries remain caller-owned.
 			tools: [
 				...tools,
-				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
+				...(opts.tools === undefined && needsSendToUser(engine.model)
 					? [withArgumentHeal(sendToUserTool)]
 					: []),
 			],
@@ -245,6 +297,16 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		// Wave C registerLiveAgent-before-runPiTurn design depends on.
 		// undefined preserves normal scheduling (the old boolean false).
 		finishTurn: (turn) => (stopper(turn) ? { action: "end" } : undefined),
+		// The guided teacher only: textbook teaches through section tools,
+		// not prose, and the prober has no checks.
+		...(kind === "teacher"
+			? {
+					beforeToolCall: async ({ toolCall, args, assistantMessage, context }) => {
+						const reason = untaughtCheckReason(toolCall.name, args, context.messages, assistantMessage);
+						return reason ? { block: true, reason } : undefined;
+					},
+				}
+			: {}),
 		// Wave C (2026-09-26, owner correction same day): markers handed to a
 		// live run drain from pi's STEERING queue — the lesson loop is one
 		// continuous teach→quiz→teach run, so delivery must inject at turn
