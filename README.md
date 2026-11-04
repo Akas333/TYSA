@@ -18,6 +18,18 @@
 </p>
 
 <p align="center">
+  <a href="#download"><img alt="macOS: supported" src="https://img.shields.io/badge/macOS-supported-brightgreen?logo=apple&logoColor=white"></a>
+  <a href="#download"><img alt="Windows: supported" src="https://img.shields.io/badge/Windows-supported-brightgreen?logo=windows&logoColor=white"></a>
+  <a href="#download"><img alt="Linux: supported" src="https://img.shields.io/badge/Linux-supported-brightgreen?logo=linux&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <a href="https://doi.org/10.1073/pnas.2422633122"><img alt="PNAS: 10.1073/pnas.2422633122" src="https://img.shields.io/badge/PNAS-10.1073%2Fpnas.2422633122-b31b1b"></a>
+  <a href="https://arxiv.org/abs/2305.14536"><img alt="arXiv: 2305.14536" src="https://img.shields.io/badge/arXiv-2305.14536-b31b1b?logo=arxiv&logoColor=white"></a>
+  <a href="https://arxiv.org/abs/2510.00844"><img alt="arXiv: 2510.00844" src="https://img.shields.io/badge/arXiv-2510.00844-b31b1b?logo=arxiv&logoColor=white"></a>
+</p>
+
+<p align="center">
   <a href="https://akas333.github.io/TYSA/">Website</a> ·
   <a href="#download">Download</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -154,6 +166,12 @@ npm run lint
 ```
 
 More detail: [architecture](docs/architecture.md), [teaching method](docs/teaching-methodology.md), [development guide](docs/development.md), [keyboard shortcuts](docs/keyboard.md).
+
+## Research
+
+- **Bastani et al., *Generative AI without guardrails can harm learning: Evidence from high school mathematics*, PNAS 2025** ([doi:10.1073/pnas.2422633122](https://doi.org/10.1073/pnas.2422633122)). The study behind the problem TYSA addresses: students who practised with an unrestricted AI tutor did worse on the exam without it.
+- **Macina et al., *MathDial: A Dialogue Tutoring Dataset with Rich Pedagogical Properties Grounded in Math Reasoning Problems*, EMNLP 2023** ([arXiv:2305.14536](https://arxiv.org/abs/2305.14536)). Evidence that LLM tutors tend to give away answers instead of scaffolding, which is why TYSA probes before it teaches.
+- **Chen et al., *Learning Compact Representations of LLM Abilities via Item Response Theory*, 2025** ([arXiv:2510.00844](https://arxiv.org/abs/2510.00844)). The item response theory groundwork for the graded-answer log, read with the learner as the respondent and each question as an item.
 
 ## License
 
