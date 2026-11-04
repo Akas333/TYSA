@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-white.png">
+    <img alt="TYSA logo" src="docs/assets/logo-dark.png" width="96">
+  </picture>
+</p>
+
 <h1 align="center">TYSA</h1>
 
 <p align="center"><em>Teach Yourself Anything</em></p>
@@ -22,6 +29,14 @@
 Most AI learning tools just explain. TYSA is an engineered learning harness: it first measures what *you* already understand, plans a path from there to your goal, and teaches one reasoning step at a time, changing the plan as soon as your answers show it was wrong about you. Two people asking the same question get two different lessons, and the app shows why.
 
 Built on Meta's Muse models for the **Meta Global AI Developer Hackathon** (Indie Developer track).
+
+### Demo
+
+<p align="center">
+  <a href="https://akas333.github.io/TYSA/assets/tysa-demo.mp4"><img alt="Watch the 3-minute TYSA demo" src="docs/assets/demo-poster.jpg" width="820"></a>
+  <br>
+  <a href="https://akas333.github.io/TYSA/assets/tysa-demo.mp4"><strong>▶ Watch the demo (3 min)</strong></a>
+</p>
 
 ![The lesson plan: a dependency map from what the learner already knows to the goal, waiting for them to confirm it](docs/assets/screenshot-plan.png)
 

@@ -5,7 +5,7 @@
  * scratch editor both land here.
  */
 
-import { isCodeLanguage, runCode, type TestCase } from "../../core/code-runner.ts";
+import { isCodeLanguage, runCode, type TestCase } from "../../server/index.ts";
 
 const MAX_CODE = 200_000;
 const MAX_TESTS = 30;

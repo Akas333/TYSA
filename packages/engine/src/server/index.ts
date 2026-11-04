@@ -52,3 +52,6 @@ export * from "./model-catalog.ts";
 export * from "./preferences.ts";
 export { subscriptionControlsResponse, subscriptionBrowserResponse } from "./web-subscription-http.ts";
 export { sessionCost } from "./pricing.ts";
+// code-runner.ts spawns local toolchains (node-only), so it rides the server
+// barrel rather than the browser-safe core one.
+export { detectToolchains, isCodeLanguage, runCode, type TestCase } from "../core/code-runner.ts";
